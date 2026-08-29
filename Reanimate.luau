@@ -508,7 +508,3 @@ spawn(function()
 		FLINGH.RotVelocity = Vector3.new(1000, 1000, 1000)
 	end
 end)
-
-local function DanceV3()
-		loadstring(game:HttpGet(""))()
-end
