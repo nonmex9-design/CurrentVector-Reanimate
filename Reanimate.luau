@@ -25,7 +25,7 @@ local v3 = Vector3.new
 local v3_0 = Vector3.zero
 local inf = math.huge
 local c = lp.Character
-local fnl = loadstring(game:HttpGetAsync 'https://raw.githubusercontent.com/Code1Tech/utils/main/notification.lua')()
+local fnl = loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/Notifications.luau"))()
 
 function notify(title, text, duration)
   title = title or "Notification"
