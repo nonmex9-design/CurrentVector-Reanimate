@@ -7,5 +7,5 @@
 *KD3:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
 
 <p align="left">
-  <img src="rounded-corners.png" width="850">
+  <img src="output-onlinepngtools (4).png" width="850">
 </p>
