@@ -6,6 +6,6 @@
 
 *KD3:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
 
-<p align="left">
-  <img src="GangnamStyle.png" width="850" style="border-radius: 20px;">
-</p>
+<div style="border-radius:20px; overflow:hidden;">
+  <img src="GangnamStyle.png" width="850">
+</div>
