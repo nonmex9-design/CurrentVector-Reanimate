@@ -82,6 +82,13 @@ local function saveFavorites()
     pcall(function() writefile(favPath, HttpService:JSONEncode(favorites)) end)
 end
 
+local function isFavorite(name)
+    for _, v in ipairs(favorites) do
+        if v == name then return true end
+    end
+    return false
+end
+
 local function toggleFavorite(name)
     for i, v in ipairs(favorites) do
         if v == name then
@@ -310,36 +317,36 @@ local function makeanimlibrary()
     return AnimLibrary
 end
 
-local wheelPages = {
-    { "Bang2", "Bang3", "Banged1", "Backflip", "BreakDance", "Floss", "Fresh", "Twerk" },
-    { "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Bang2", "Bang3", "Banged1" },
-    { "Backflip", "BreakDance", "Floss", "Fresh", "Twerk", "Groovv", "Kazotsky Kick (Spy)", "Parrot" },
+local allDances = {
+    "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh",
+    "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Twerk",
 }
 
-local dancePages = {}
-for _, page in ipairs(wheelPages) do
-    local row = {}
-    for i = 1, 3 do table.insert(row, page[i]) end
-    table.insert(dancePages, row)
-end
-
-local allDances = {}
-for _, page in ipairs(wheelPages) do
-    for _, name in ipairs(page) do
-        local exists = false
-        for _, n in ipairs(allDances) do
-            if n == name then exists = true break end
+local PER_PAGE = 8
+local wheelPages = {}
+do
+    local i = 1
+    while i <= #allDances do
+        local page = {}
+        for j = i, math.min(i + PER_PAGE - 1, #allDances) do
+            table.insert(page, allDances[j])
         end
-        if not exists then table.insert(allDances, name) end
+        table.insert(wheelPages, page)
+        i = i + PER_PAGE
     end
 end
+
+local searchQuery = ""
+local inFavoritesView = false
 
 local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true, Bang3 = true, Banged1 = true }
 
 local player = Players.LocalPlayer
 local currentPage = 1
 local wheelPlayRef = { fn = nil }
-local wheelNavRef = { pageLabel = nil, total = #wheelPages }
+local wheelNavRef = { pageLabel = nil, total = #wheelPages, refresh = nil }
+local searchBoxRef = { box = nil }
+local favBtnRef = { btn = nil }
 
 local music = Instance.new("Sound")
 music.Name = "CurrentVectorMusic"
@@ -515,18 +522,50 @@ end
 local function refreshWheelSlot(index, danceName, character)
     local slot = wheelSlots[index]
     if not slot then return end
+    if slot.danceName == danceName then return end
     slot.danceName = danceName
     slot.text.Text = danceName or ""
-    if danceName then buildPreviewForSlot(slot, danceName, character) end
+    if danceName then
+        buildPreviewForSlot(slot, danceName, character)
+    end
 end
 
-local function refreshWheelPage(page)
+local function getDisplayedEmotes()
+    if searchQuery ~= "" then
+        local q = string.lower(searchQuery)
+        local filtered = {}
+        for _, name in ipairs(allDances) do
+            if string.find(string.lower(name), q, 1, true) then
+                table.insert(filtered, name)
+            end
+        end
+        return filtered, "Search: " .. searchQuery
+    end
+    if inFavoritesView then
+        return favorites, "Favorites (" .. tostring(#favorites) .. ")"
+    end
+    local page = wheelPages[currentPage] or {}
+    return page, "Page " .. currentPage .. " / " .. #wheelPages
+end
+
+local function refreshWheelPage()
     if not wheelHooked then return end
+    local emotes, label = getDisplayedEmotes()
     local character = player.Character
-    local pageDances = wheelPages[page] or wheelPages[1]
-    for i = 1, 8 do refreshWheelSlot(i, pageDances[i], character) end
+    for i = 1, 8 do
+        refreshWheelSlot(i, emotes[i], character)
+    end
     if wheelNavRef.pageLabel then
-        wheelNavRef.pageLabel.Text = "Page " .. tostring(page) .. " / " .. tostring(wheelNavRef.total)
+        wheelNavRef.pageLabel.Text = label
+    end
+    if favBtnRef.btn then
+        if inFavoritesView then
+            favBtnRef.btn.Text = "★"
+            favBtnRef.btn.TextColor3 = Color3.fromRGB(255, 200, 60)
+        else
+            favBtnRef.btn.Text = "☆"
+            favBtnRef.btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
     end
 end
 
@@ -632,8 +671,102 @@ local function hookRobloxEmoteWheel()
     end
 
     for _, child in ipairs(wheel:GetChildren()) do
+        if child.Name == "CVTopBar" then child:Destroy() end
         if child.Name == "CVNav" then child:Destroy() end
     end
+
+    local topBar = Instance.new("Frame")
+    topBar.Name = "CVTopBar"
+    topBar.Size = UDim2.new(1, 0, 0, 44)
+    topBar.AnchorPoint = Vector2.new(0.5, 1)
+    topBar.Position = UDim2.new(0.5, 0, 0, -14)
+    topBar.BackgroundTransparency = 1
+    topBar.ZIndex = 30
+    topBar.Parent = wheel
+
+    local searchFrame = Instance.new("Frame")
+    searchFrame.Name = "CVSearchFrame"
+    searchFrame.Size = UDim2.new(0.7, -5, 1, 0)
+    searchFrame.Position = UDim2.new(0, 0, 0, 0)
+    searchFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+    searchFrame.BackgroundTransparency = 0.15
+    searchFrame.BorderSizePixel = 0
+    searchFrame.ZIndex = 30
+    searchFrame.Parent = topBar
+    local sfCorner = Instance.new("UICorner")
+    sfCorner.CornerRadius = UDim.new(0, 10)
+    sfCorner.Parent = searchFrame
+    local sfStroke = Instance.new("UIStroke")
+    sfStroke.Color = Color3.fromRGB(90, 90, 130)
+    sfStroke.Thickness = 2
+    sfStroke.Parent = searchFrame
+
+    local searchIcon = Instance.new("TextLabel")
+    searchIcon.Size = UDim2.new(0, 32, 1, 0)
+    searchIcon.Position = UDim2.new(0, 6, 0, 0)
+    searchIcon.BackgroundTransparency = 1
+    searchIcon.Text = "🔍"
+    searchIcon.TextColor3 = Color3.fromRGB(180, 180, 200)
+    searchIcon.Font = Enum.Font.GothamBold
+    searchIcon.TextSize = 20
+    searchIcon.ZIndex = 31
+    searchIcon.Parent = searchFrame
+
+    local searchBox = Instance.new("TextBox")
+    searchBox.Name = "CVSearchInput"
+    searchBox.Size = UDim2.new(1, -46, 1, 0)
+    searchBox.Position = UDim2.new(0, 40, 0, 0)
+    searchBox.BackgroundTransparency = 1
+    searchBox.Text = ""
+    searchBox.PlaceholderText = "Search emotes..."
+    searchBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 155)
+    searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 16
+    searchBox.TextXAlignment = Enum.TextXAlignment.Left
+    searchBox.ClearTextOnFocus = false
+    searchBox.ZIndex = 31
+    searchBox.Parent = searchFrame
+
+    searchBoxRef.box = searchBox
+
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        searchQuery = searchBox.Text
+        if wheelNavRef.refresh then wheelNavRef.refresh() end
+    end)
+
+    local favBtn = Instance.new("TextButton")
+    favBtn.Name = "CVFavBtn"
+    favBtn.Size = UDim2.new(0.28, -5, 1, 0)
+    favBtn.Position = UDim2.new(0.72, 0, 0, 0)
+    favBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    favBtn.BackgroundTransparency = 0.15
+    favBtn.BorderSizePixel = 0
+    favBtn.Text = "☆"
+    favBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    favBtn.TextStrokeTransparency = 0.4
+    favBtn.Font = Enum.Font.GothamBold
+    favBtn.TextScaled = true
+    favBtn.ZIndex = 30
+    favBtn.Parent = topBar
+    local fbCorner = Instance.new("UICorner")
+    fbCorner.CornerRadius = UDim.new(0, 10)
+    fbCorner.Parent = favBtn
+    local fbStroke = Instance.new("UIStroke")
+    fbStroke.Color = Color3.fromRGB(90, 90, 130)
+    fbStroke.Thickness = 2
+    fbStroke.Parent = favBtn
+
+    favBtnRef.btn = favBtn
+
+    favBtn.MouseButton1Click:Connect(function()
+        inFavoritesView = not inFavoritesView
+        if wheelNavRef.refresh then wheelNavRef.refresh() end
+    end)
+    favBtn.TouchTap:Connect(function()
+        inFavoritesView = not inFavoritesView
+        if wheelNavRef.refresh then wheelNavRef.refresh() end
+    end)
 
     local navFrame = Instance.new("Frame")
     navFrame.Name = "CVNav"
@@ -697,34 +830,42 @@ local function hookRobloxEmoteWheel()
     forwardCorner.Parent = forwardBtn
 
     wheelNavRef.pageLabel = pageLabel
+    wheelNavRef.refresh = refreshWheelPage
 
-    backBtn.MouseButton1Click:Connect(function()
+    local function goBack()
+        if searchQuery ~= "" or inFavoritesView then return end
         currentPage = currentPage - 1
         if currentPage < 1 then currentPage = #wheelPages end
-        refreshWheelPage(currentPage)
-    end)
-    forwardBtn.MouseButton1Click:Connect(function()
+        refreshWheelPage()
+    end
+
+    local function goForward()
+        if searchQuery ~= "" or inFavoritesView then return end
         currentPage = currentPage + 1
         if currentPage > #wheelPages then currentPage = 1 end
-        refreshWheelPage(currentPage)
-    end)
-    backBtn.TouchTap:Connect(function()
-        currentPage = currentPage - 1
-        if currentPage < 1 then currentPage = #wheelPages end
-        refreshWheelPage(currentPage)
-    end)
-    forwardBtn.TouchTap:Connect(function()
-        currentPage = currentPage + 1
-        if currentPage > #wheelPages then currentPage = 1 end
-        refreshWheelPage(currentPage)
-    end)
+        refreshWheelPage()
+    end
+
+    backBtn.MouseButton1Click:Connect(goBack)
+    forwardBtn.MouseButton1Click:Connect(goForward)
+    backBtn.TouchTap:Connect(goBack)
+    forwardBtn.TouchTap:Connect(goForward)
     backBtn.MouseEnter:Connect(function() backBtn.BackgroundTransparency = 0 end)
     backBtn.MouseLeave:Connect(function() backBtn.BackgroundTransparency = 0.3 end)
     forwardBtn.MouseEnter:Connect(function() forwardBtn.BackgroundTransparency = 0 end)
     forwardBtn.MouseLeave:Connect(function() forwardBtn.BackgroundTransparency = 0.3 end)
 
+    wheel:GetPropertyChangedSignal("Visible"):Connect(function()
+        if not wheel.Visible then
+            if searchBoxRef.box then searchBoxRef.box.Text = "" end
+            searchQuery = ""
+            inFavoritesView = false
+            refreshWheelPage()
+        end
+    end)
+
     wheelHooked = true
-    refreshWheelPage(currentPage)
+    refreshWheelPage()
 end
 
 pcall(hookRobloxEmoteWheel)
@@ -860,19 +1001,19 @@ local function buildMobileUI(character, ctx)
     end
 
     makeBtn("Dance 1", 1, Color3.fromRGB(60, 60, 120), function()
-        local d = dancePages[currentPage][1]
+        local d = wheelPages[currentPage] and wheelPages[currentPage][1]
         if d then
             if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
     end)
     makeBtn("Dance 2", 2, Color3.fromRGB(60, 60, 120), function()
-        local d = dancePages[currentPage][2]
+        local d = wheelPages[currentPage] and wheelPages[currentPage][2]
         if d then
             if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
     end)
     makeBtn("Dance 3", 3, Color3.fromRGB(60, 60, 120), function()
-        local d = dancePages[currentPage][3]
+        local d = wheelPages[currentPage] and wheelPages[currentPage][3]
         if d then
             if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
@@ -881,7 +1022,7 @@ local function buildMobileUI(character, ctx)
         currentPage = currentPage + 1
         if currentPage > #wheelPages then currentPage = 1 end
         pageLabelMobile.Text = "Page " .. currentPage .. " / " .. #wheelPages
-        refreshWheelPage(currentPage)
+        refreshWheelPage()
         notify("Page " .. currentPage)
     end)
     local sitBtn = makeBtn("Sit", 5, Color3.fromRGB(60, 90, 60), function()
@@ -1285,16 +1426,19 @@ local function setupCharacter(character)
         end
 
         if key == "q" or key == "e" or key == "r" then
+            local emotes = getDisplayedEmotes()
             local idx = (key == "q" and 1) or (key == "e" and 2) or 3
-            local dance = dancePages[currentPage][idx]
+            local dance = emotes[idx]
             if dance then
                 if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
             end
         elseif key == "m" then
-            currentPage = currentPage + 1
-            if currentPage > #wheelPages then currentPage = 1 end
-            notify("Page " .. currentPage)
-            refreshWheelPage(currentPage)
+            if searchQuery == "" and not inFavoritesView then
+                currentPage = currentPage + 1
+                if currentPage > #wheelPages then currentPage = 1 end
+                notify("Page " .. currentPage)
+                refreshWheelPage()
+            end
         elseif key == "equals" then
             bgMusicOn = not bgMusicOn
             if bgMusicOn then music:Play() notify("Music ON") else music:Stop() notify("Music OFF") end
@@ -1314,7 +1458,8 @@ local function setupCharacter(character)
         elseif key == "one" or key == "two" or key == "three" or key == "four"
             or key == "five" or key == "six" or key == "seven" or key == "eight" then
             local map = { one = 1, two = 2, three = 3, four = 4, five = 5, six = 6, seven = 7, eight = 8 }
-            local dance = wheelPages[currentPage][map[key]]
+            local emotes = getDisplayedEmotes()
+            local dance = emotes[map[key]]
             if dance then
                 if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
             end
@@ -1322,6 +1467,7 @@ local function setupCharacter(character)
             if currentAnimName and not (currentAnimName == "Idle" or currentAnimName == "WalkV2" or currentAnimName == "RunV2") then
                 local added = toggleFavorite(currentAnimName)
                 notify(added and ("Favorited " .. currentAnimName) or ("Unfavorited " .. currentAnimName))
+                if inFavoritesView then refreshWheelPage() end
             end
         end
     end))
@@ -1340,10 +1486,6 @@ local function setupCharacter(character)
         local lower = string.lower(msg)
         if string.sub(lower, 1, 7) == "/dance " then
             local name = string.sub(msg, 8)
-            if string.lower(name) == "twerk" or string.lower(name) == "tw" then
-                playTwerk()
-                return
-            end
             for _, d in ipairs(allDances) do
                 if string.lower(d) == string.lower(name) then
                     playDance(d)
@@ -1360,7 +1502,7 @@ local function setupCharacter(character)
         elseif lower == "/wave" then
             playWave()
             notify("Waving")
-        elseif lower == "/tw" then
+        elseif lower == "/tw" or lower == "/twerk" then
             playTwerk()
             notify("Twerking")
         elseif lower == "/sit" then
@@ -1531,7 +1673,7 @@ local function setupCharacter(character)
     if bgMusicOn then music:Play() end
     notify("CurrentVector-Dances V1 loaded")
 
-    task.delay(1, function() refreshWheelPage(currentPage) end)
+    task.delay(1, function() refreshWheelPage() end)
 end
 
 characterConn = player.CharacterAdded:Connect(setupCharacter)
@@ -1547,6 +1689,6 @@ else
     print("Stop: Backspace | Speed: [ ]")
     print("Favorite: F | Sprint: Hold LeftControl")
 end
-print("Wheel: 1-8 keys or click Roblox emotes wheel (8 slots now)")
+print("Wheel: Search bar + Favorites button + 8 slots per page")
 print("Chat: /dance <name> | /poop | /pp | /wave | /tw | /sit | /unsit | /stop | /cv")
 print("==========================================")
