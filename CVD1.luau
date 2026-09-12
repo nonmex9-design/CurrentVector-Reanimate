@@ -16,16 +16,12 @@ local FORCE_REFRESH = true
 local shared = (getgenv and getgenv()) or _G
 
 if shared.CurrentVectorCleanup then
-    print("[CurrentVector-Dances V1] Previous run detected, cleaning up...")
     pcall(shared.CurrentVectorCleanup)
     shared.CurrentVectorCleanup = nil
 end
 
 local existingResetGui = CoreGui:FindFirstChild(RESET_GUI_NAME)
-if existingResetGui then
-    print("[CurrentVector-Dances V1] Found stale reset GUI, destroying...")
-    existingResetGui:Destroy()
-end
+if existingResetGui then existingResetGui:Destroy() end
 
 pcall(function()
     if isfolder and not isfolder("CurrentVector") then makefolder("CurrentVector") end
@@ -40,6 +36,7 @@ local animList = {
     "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh", "Groovv",
     "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll",
     "Idle", "Walk", "Run", "WalkV2", "RunV2", "Jump", "Fall", "Land", "Poop",
+    "Sit2", "Sitting",
 }
 
 local function isValidRbxm(data)
@@ -49,9 +46,7 @@ local function isValidRbxm(data)
 end
 
 local function tryHttpGet(url)
-    local ok, data = pcall(function()
-        return game:HttpGet(url)
-    end)
+    local ok, data = pcall(function() return game:HttpGet(url) end)
     if ok and data then return data end
     return nil
 end
@@ -59,57 +54,31 @@ end
 local function downloadAnim(name)
     local path = "CurrentVector/Animations/" .. name .. ".rbxm"
     local encoded = name:gsub(" ", "%%20")
-
-    print("[CurrentVector-Dances V1] Downloading " .. name)
     local data = tryHttpGet(primaryBase .. encoded .. ".rbxm")
     if not data or not isValidRbxm(data) then
-        print("[CurrentVector-Dances V1] Primary URL failed for " .. name .. ", trying fallback...")
         data = tryHttpGet(fallbackBase .. encoded .. ".rbxm")
     end
-
-    if not data then
-        warn("[CurrentVector-Dances V1] " .. name .. " could not be fetched from either URL")
+    if not data or not isValidRbxm(data) then
+        warn("[CurrentVector-Dances V1] " .. name .. " failed")
         return
     end
-
-    if not isValidRbxm(data) then
-        warn("[CurrentVector-Dances V1] " .. name .. " returned invalid data. Size: " .. tostring(#data))
-        local preview = string.sub(data, 1, 160)
-        warn("[CurrentVector-Dances V1] Preview: " .. preview)
-        return
-    end
-
-    local wrote = pcall(function()
-        writefile(path, data)
-    end)
-    if wrote then
-        print("[CurrentVector-Dances V1] OK " .. name .. " (" .. tostring(#data) .. " bytes)")
-    else
-        warn("[CurrentVector-Dances V1] Write failed for " .. name)
-    end
+    pcall(function() writefile(path, data) end)
 end
 
 for _, name in ipairs(animList) do
     local path = "CurrentVector/Animations/" .. name .. ".rbxm"
-    if FORCE_REFRESH or not isfile(path) then
-        downloadAnim(name)
-    end
+    if FORCE_REFRESH or not isfile(path) then downloadAnim(name) end
 end
-print("[CurrentVector-Dances V1] Animations ready")
 
 local favPath = "CurrentVector/favorites.json"
 local favorites = {}
 if isfile(favPath) then
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(readfile(favPath))
-    end)
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(favPath)) end)
     if ok and type(data) == "table" then favorites = data end
 end
 
 local function saveFavorites()
-    pcall(function()
-        writefile(favPath, HttpService:JSONEncode(favorites))
-    end)
+    pcall(function() writefile(favPath, HttpService:JSONEncode(favorites)) end)
 end
 
 local function toggleFavorite(name)
@@ -136,9 +105,7 @@ local function notify(text, dur)
 end
 
 local function customasset(id)
-    if not isfile or not getcustomasset then
-        return "rbxassetid://1837879082"
-    end
+    if not isfile or not getcustomasset then return "rbxassetid://1837879082" end
     local path = "CurrentVector/Music/" .. id
     if not isfile(path) then
         local ok = pcall(function()
@@ -220,6 +187,7 @@ local function makeanimlibrary()
         self.TimePosition = 0
         self.IsPlaying = false
         self.Speed = 1
+        self.OnStopped = nil
         if typeof(target) == 'Instance' and target:IsA('Model') then
             self.Motor6D = AutoGetMotor6D(target)
         else
@@ -276,7 +244,9 @@ local function makeanimlibrary()
                         pos = pos + self.Length
                     else
                         pos = 0
+                        local cb = self.OnStopped
                         self:Stop()
+                        if cb then cb() end
                         return
                     end
                 end
@@ -286,7 +256,9 @@ local function makeanimlibrary()
                         pos = pos - self.Length
                     else
                         pos = self.Length
+                        local cb = self.OnStopped
                         self:Stop()
+                        if cb then cb() end
                         return
                     end
                 end
@@ -346,9 +318,7 @@ local wheelPages = {
 local dancePages = {}
 for _, page in ipairs(wheelPages) do
     local row = {}
-    for i = 1, 3 do
-        table.insert(row, page[i])
-    end
+    for i = 1, 3 do table.insert(row, page[i]) end
     table.insert(dancePages, row)
 end
 
@@ -364,7 +334,6 @@ for _, page in ipairs(wheelPages) do
 end
 
 local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true, Bang3 = true, Banged1 = true }
-local platformDances = { Backflip = true, Helicopter = true }
 
 local player = Players.LocalPlayer
 local currentPage = 1
@@ -397,7 +366,6 @@ local function disconnectAll()
 end
 
 local function fullCleanup()
-    print("[CurrentVector-Dances V1] Running full cleanup")
     disconnectAll()
     pcall(function() music:Stop() end)
     pcall(function() music:Destroy() end)
@@ -411,20 +379,19 @@ local function fullCleanup()
         end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
-            pcall(function()
-                hum.PlatformStand = false
-                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-                hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-                hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
-            end)
+            pcall(function() hum.PlatformStand = false end)
+        end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            pcall(function() hrp.Anchored = false end)
         end
     end
 
     for k in pairs(LAST_POSE) do LAST_POSE[k] = nil end
     for k in pairs(EXTRA_TILT) do EXTRA_TILT[k] = nil end
 
-    local resetGui = CoreGui:FindFirstChild(RESET_GUI_NAME)
-    if resetGui then resetGui:Destroy() end
+    local rg = CoreGui:FindFirstChild(RESET_GUI_NAME)
+    if rg then rg:Destroy() end
 end
 
 shared.CurrentVectorCleanup = fullCleanup
@@ -486,9 +453,7 @@ local function loadKFForPreview(name)
     if not isfile(path) then return nil end
     local ok, assetId = pcall(getcustomasset, path)
     if not ok then return nil end
-    local ok2, obj = pcall(function()
-        return InsertService:LoadLocalAsset(assetId)
-    end)
+    local ok2, obj = pcall(function() return InsertService:LoadLocalAsset(assetId) end)
     if not ok2 or not obj then return nil end
     return findKF(obj)
 end
@@ -496,7 +461,6 @@ end
 local function poseClone(clone, danceName)
     local kf = loadKFForPreview(danceName)
     if not kf then return end
-
     local motors = {}
     for _, part in ipairs(clone:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -508,36 +472,25 @@ local function poseClone(clone, danceName)
             end
         end
     end
-
     local kfs = kf:GetKeyframes()
     if #kfs == 0 then return end
     local kfIndex = math.max(1, math.floor(#kfs * 0.4))
     local chosen = kfs[kfIndex]
-
     for _, pose in ipairs(chosen:GetDescendants()) do
         if pose:IsA("Pose") and pose.Weight > 0 then
             local motor = motors[pose.Name]
-            if motor then
-                motor.C0 = motor.C0 * pose.CFrame
-            end
+            if motor then motor.C0 = motor.C0 * pose.CFrame end
         end
     end
 end
 
 local function buildPreviewForSlot(slot, danceName, character)
     if not character then return end
-
     for _, child in ipairs(slot.viewport:GetChildren()) do
-        if not child:IsA("Camera") then
-            child:Destroy()
-        end
+        if not child:IsA("Camera") then child:Destroy() end
     end
-
-    local ok, clone = pcall(function()
-        return character:Clone()
-    end)
+    local ok, clone = pcall(function() return character:Clone() end)
     if not ok or not clone then return end
-
     for _, d in ipairs(clone:GetDescendants()) do
         if d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Sound") then
             d:Destroy()
@@ -547,14 +500,9 @@ local function buildPreviewForSlot(slot, danceName, character)
         end
     end
     clone.Name = "Preview_" .. danceName
-
     pcall(poseClone, clone, danceName)
-
     local hrp = clone:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hrp.CFrame = CFrame.new(0, 0, 0)
-    end
-
+    if hrp then hrp.CFrame = CFrame.new(0, 0, 0) end
     clone.Parent = slot.viewport
 end
 
@@ -563,18 +511,14 @@ local function refreshWheelSlot(index, danceName, character)
     if not slot then return end
     slot.danceName = danceName
     slot.text.Text = danceName or ""
-    if danceName then
-        buildPreviewForSlot(slot, danceName, character)
-    end
+    if danceName then buildPreviewForSlot(slot, danceName, character) end
 end
 
 local function refreshWheelPage(page)
     if not wheelHooked then return end
     local character = player.Character
     local pageDances = wheelPages[page] or wheelPages[1]
-    for i = 1, 8 do
-        refreshWheelSlot(i, pageDances[i], character)
-    end
+    for i = 1, 8 do refreshWheelSlot(i, pageDances[i], character) end
     if wheelNavRef.pageLabel then
         wheelNavRef.pageLabel.Text = "Page " .. tostring(page) .. " / " .. tostring(wheelNavRef.total)
     end
@@ -582,44 +526,25 @@ end
 
 local function hookRobloxEmoteWheel()
     if wheelHooked then return end
-
-    local ok1, RobloxGui = pcall(function()
-        return CoreGui:WaitForChild("RobloxGui", 15)
-    end)
-    if not ok1 or not RobloxGui then
-        warn("[CurrentVector-Dances V1] RobloxGui not found")
-        return
-    end
-
-    local ok2, EmotesMenu = pcall(function()
-        return RobloxGui:WaitForChild("EmotesMenu", 15)
-    end)
-    if not ok2 or not EmotesMenu then
-        warn("[CurrentVector-Dances V1] EmotesMenu not found")
-        return
-    end
-
+    local ok1, RobloxGui = pcall(function() return CoreGui:WaitForChild("RobloxGui", 15) end)
+    if not ok1 or not RobloxGui then return end
+    local ok2, EmotesMenu = pcall(function() return RobloxGui:WaitForChild("EmotesMenu", 15) end)
+    if not ok2 or not EmotesMenu then return end
     local wheel, emotesButtons, slotNumbers
     local ok3 = pcall(function()
         wheel = EmotesMenu.Children.Main.EmotesWheel
         emotesButtons = wheel.Front.EmotesButtons
         slotNumbers = wheel.Front.SlotNumbers
     end)
-    if not ok3 or not emotesButtons or not slotNumbers then
-        warn("[CurrentVector-Dances V1] Wheel structure not found")
-        return
-    end
+    if not ok3 or not emotesButtons or not slotNumbers then return end
 
     for i = 1, 8 do
         local img = emotesButtons:FindFirstChild(tostring(i))
         if img and img:IsA("ImageLabel") then
             img.ImageTransparency = 1
             img.BackgroundTransparency = 1
-
             for _, child in ipairs(img:GetChildren()) do
-                if string.sub(child.Name, 1, 2) == "CV" then
-                    child:Destroy()
-                end
+                if string.sub(child.Name, 1, 2) == "CV" then child:Destroy() end
             end
 
             local viewport = Instance.new("ViewportFrame")
@@ -662,33 +587,18 @@ local function hookRobloxEmoteWheel()
             btn.ZIndex = 10
             btn.Parent = img
 
-            local slot = {
-                img = img,
-                viewport = viewport,
-                text = text,
-                button = btn,
-                danceName = nil,
-            }
-
+            local slot = { img = img, viewport = viewport, text = text, button = btn, danceName = nil }
             btn.MouseButton1Click:Connect(function()
-                if wheelPlayRef.fn and slot.danceName then
-                    wheelPlayRef.fn(slot.danceName)
-                end
+                if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
             end)
-
             wheelSlots[i] = slot
         end
-
         local num = slotNumbers:FindFirstChild(tostring(i))
-        if num and num:IsA("TextLabel") then
-            num.Text = tostring(i)
-        end
+        if num and num:IsA("TextLabel") then num.Text = tostring(i) end
     end
 
     for _, child in ipairs(wheel:GetChildren()) do
-        if child.Name == "CVNav" then
-            child:Destroy()
-        end
+        if child.Name == "CVNav" then child:Destroy() end
     end
 
     local navFrame = Instance.new("Frame")
@@ -759,25 +669,15 @@ local function hookRobloxEmoteWheel()
         if currentPage < 1 then currentPage = #wheelPages end
         refreshWheelPage(currentPage)
     end)
-
     forwardBtn.MouseButton1Click:Connect(function()
         currentPage = currentPage + 1
         if currentPage > #wheelPages then currentPage = 1 end
         refreshWheelPage(currentPage)
     end)
-
-    backBtn.MouseEnter:Connect(function()
-        backBtn.BackgroundTransparency = 0
-    end)
-    backBtn.MouseLeave:Connect(function()
-        backBtn.BackgroundTransparency = 0.3
-    end)
-    forwardBtn.MouseEnter:Connect(function()
-        forwardBtn.BackgroundTransparency = 0
-    end)
-    forwardBtn.MouseLeave:Connect(function()
-        forwardBtn.BackgroundTransparency = 0.3
-    end)
+    backBtn.MouseEnter:Connect(function() backBtn.BackgroundTransparency = 0 end)
+    backBtn.MouseLeave:Connect(function() backBtn.BackgroundTransparency = 0.3 end)
+    forwardBtn.MouseEnter:Connect(function() forwardBtn.BackgroundTransparency = 0 end)
+    forwardBtn.MouseLeave:Connect(function() forwardBtn.BackgroundTransparency = 0.3 end)
 
     wheelHooked = true
     refreshWheelPage(currentPage)
@@ -806,6 +706,7 @@ local function setupCharacter(character)
     local currentAnim = nil
     local currentAnimName = nil
     local isDancing = false
+    local isSitting = false
     local sprinting = false
     local inAir = false
     local jumpPlaying = false
@@ -835,28 +736,21 @@ local function setupCharacter(character)
         if not isfile(path) then return nil end
         local ok, assetId = pcall(getcustomasset, path)
         if not ok then return nil end
-        local ok2, obj = pcall(function()
-            return InsertService:LoadLocalAsset(assetId)
-        end)
+        local ok2, obj = pcall(function() return InsertService:LoadLocalAsset(assetId) end)
         if not ok2 or not obj then return nil end
         return findKF(obj)
     end
 
-    local function applyPlatformStand(state)
+    local function freezeInPlace(state)
+        hrp.Anchored = state
         if state then
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
-            hum.PlatformStand = true
-        else
+            hrp.Velocity = Vector3.zero
+            hrp.RotVelocity = Vector3.zero
             hum.PlatformStand = false
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
         end
     end
 
-    local function playAnim(name, speed, looped)
+    local function playAnim(name, speed, looped, freeze)
         if currentAnim then
             currentAnim:Stop()
             currentAnim = nil
@@ -878,11 +772,7 @@ local function setupCharacter(character)
             removeParticles(character)
         end
 
-        if platformDances[name] then
-            applyPlatformStand(true)
-        else
-            applyPlatformStand(false)
-        end
+        freezeInPlace(freeze == true)
     end
 
     local function stopDance()
@@ -892,8 +782,9 @@ local function setupCharacter(character)
         end
         currentAnimName = nil
         isDancing = false
+        isSitting = false
         removeParticles(character)
-        applyPlatformStand(false)
+        freezeInPlace(false)
         for _, m in pairs(rigTable) do
             m.C0 = ORIGINAL_C0[m.Name] or m.C0
         end
@@ -904,12 +795,14 @@ local function setupCharacter(character)
 
     local function playDance(name)
         isDancing = true
-        playAnim(name, 1, true)
+        isSitting = false
+        playAnim(name, 1, true, true)
     end
 
     local function playOnce(name)
         isDancing = true
-        playAnim(name, 1, false)
+        isSitting = false
+        playAnim(name, 1, false, true)
         local played = currentAnim
         if played then
             local len = played.Length or 2
@@ -921,10 +814,28 @@ local function setupCharacter(character)
                     if currentAnim ~= played then return end
                     if not played.IsPlaying then break end
                 end
-                if currentAnim == played then
-                    stopDance()
-                end
+                if currentAnim == played then stopDance() end
             end)
+        end
+    end
+
+    local function playSit()
+        isDancing = true
+        isSitting = true
+
+        task.spawn(function()
+            pcall(function() loadKF("Sitting") end)
+        end)
+
+        playAnim("Sit2", 1, false, true)
+        local sitAnim = currentAnim
+        if sitAnim then
+            sitAnim.OnStopped = function()
+                if currentAnim == sitAnim or currentAnim == nil then
+                    playAnim("Sitting", 1, true, true)
+                    currentAnimName = "Sitting"
+                end
+            end
         end
     end
 
@@ -936,30 +847,30 @@ local function setupCharacter(character)
             if walkingBackward then
                 hum.WalkSpeed = 10
                 if currentAnimName ~= "WalkV2" then
-                    playAnim("WalkV2", -1, true)
+                    playAnim("WalkV2", -1, true, false)
                 elseif currentAnim then
                     currentAnim.Speed = -1
                 end
             elseif sprinting then
                 hum.WalkSpeed = 18
-                if currentAnimName ~= "RunV2" then playAnim("RunV2", 1, true) end
+                if currentAnimName ~= "RunV2" then playAnim("RunV2", 1, true, false) end
             else
                 hum.WalkSpeed = 10
                 if currentAnimName ~= "WalkV2" then
-                    playAnim("WalkV2", 1, true)
+                    playAnim("WalkV2", 1, true, false)
                 elseif currentAnim then
                     currentAnim.Speed = 1
                 end
             end
         else
             walkingBackward = false
-            if currentAnimName ~= "Idle" then playAnim("Idle", 1, true) end
+            if currentAnimName ~= "Idle" then playAnim("Idle", 1, true, false) end
         end
     end
 
     local function playLand()
         landPlaying = true
-        playAnim("Land", 1, false)
+        playAnim("Land", 1, false, false)
         local landAnim = currentAnim
         task.spawn(function()
             if landAnim then
@@ -992,21 +903,19 @@ local function setupCharacter(character)
             inAir = true
             jumpPlaying = true
             landPlaying = false
-            playAnim("Jump", 1, false)
+            playAnim("Jump", 1, false, false)
             local jumpAnim = currentAnim
             task.spawn(function()
                 while jumpAnim.IsPlaying and jumpAnim == currentAnim do
                     RunService.RenderStepped:Wait()
                 end
                 if currentAnim == jumpAnim and inAir and not jumpPlaying then
-                    playAnim("Fall", 1, true)
+                    playAnim("Fall", 1, true, false)
                 end
             end)
         elseif newState == Enum.HumanoidStateType.Freefall then
             inAir = true
-            if not jumpPlaying then
-                playAnim("Fall", 1, true)
-            end
+            if not jumpPlaying then playAnim("Fall", 1, true, false) end
             freefallStart = tick()
         elseif newState == Enum.HumanoidStateType.Landed
             or newState == Enum.HumanoidStateType.Running
@@ -1015,11 +924,7 @@ local function setupCharacter(character)
                 local fallTime = tick() - freefallStart
                 inAir = false
                 jumpPlaying = false
-                if fallTime >= 0.35 then
-                    playLand()
-                else
-                    updateMovementAnim()
-                end
+                if fallTime >= 0.35 then playLand() else updateMovementAnim() end
             end
         end
     end))
@@ -1039,11 +944,7 @@ local function setupCharacter(character)
             local idx = (key == "q" and 1) or (key == "e" and 2) or 3
             local dance = dancePages[currentPage][idx]
             if dance then
-                if isDancing and currentAnimName == dance then
-                    stopDance()
-                else
-                    playDance(dance)
-                end
+                if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
             end
         elseif key == "m" then
             currentPage = currentPage + 1
@@ -1052,13 +953,7 @@ local function setupCharacter(character)
             refreshWheelPage(currentPage)
         elseif key == "equals" then
             bgMusicOn = not bgMusicOn
-            if bgMusicOn then
-                music:Play()
-                notify("Music ON")
-            else
-                music:Stop()
-                notify("Music OFF")
-            end
+            if bgMusicOn then music:Play() notify("Music ON") else music:Stop() notify("Music OFF") end
         elseif key == "backspace" then
             stopDance()
             notify("Stopped")
@@ -1077,11 +972,7 @@ local function setupCharacter(character)
             local map = { one = 1, two = 2, three = 3, four = 4, five = 5, six = 6, seven = 7, eight = 8 }
             local dance = wheelPages[currentPage][map[key]]
             if dance then
-                if isDancing and currentAnimName == dance then
-                    stopDance()
-                else
-                    playDance(dance)
-                end
+                if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
             end
         elseif key == "f" then
             if currentAnimName and not (currentAnimName == "Idle" or currentAnimName == "WalkV2" or currentAnimName == "RunV2") then
@@ -1115,6 +1006,21 @@ local function setupCharacter(character)
         elseif lower == "/poop" then
             playOnce("Poop")
             notify("Poop!")
+        elseif lower == "/sit" then
+            if isSitting then
+                stopDance()
+                notify("Stood up")
+            else
+                playSit()
+                notify("Sitting")
+            end
+        elseif lower == "/unsit" then
+            if isSitting then
+                stopDance()
+                notify("Stood up")
+            else
+                notify("Not sitting")
+            end
         elseif lower == "/stop" then
             stopDance()
         elseif lower == "/cv" then
@@ -1145,12 +1051,9 @@ local function setupCharacter(character)
             tiltLHip = tiltLHip:Lerp(CFrame.new(), 0.15)
         else
             local targets = {
-                RootJoint = CFrame.new(),
-                Neck = CFrame.new(),
-                RightShoulder = CFrame.new(),
-                LeftShoulder = CFrame.new(),
-                RightHip = CFrame.new(),
-                LeftHip = CFrame.new(),
+                RootJoint = CFrame.new(), Neck = CFrame.new(),
+                RightShoulder = CFrame.new(), LeftShoulder = CFrame.new(),
+                RightHip = CFrame.new(), LeftHip = CFrame.new(),
             }
             if moveDirection:Dot(Vector3.new(1,0,-1).Unit) > threshold then
                 targets.RootJoint = CFrame.Angles(math.rad(-moveDirection.Z) * 3, 0, math.rad(-moveDirection.X) * 10)
@@ -1272,13 +1175,11 @@ local function setupCharacter(character)
         hum.CameraOffset = hum.CameraOffset:Lerp(baseOffset + bobOffset, math.min(dt * 8, 1))
     end))
 
-    playAnim("Idle", 1, true)
+    playAnim("Idle", 1, true, false)
     if bgMusicOn then music:Play() end
     notify("CurrentVector-Dances V1 loaded")
 
-    task.delay(1, function()
-        refreshWheelPage(currentPage)
-    end)
+    task.delay(1, function() refreshWheelPage(currentPage) end)
 end
 
 characterConn = player.CharacterAdded:Connect(setupCharacter)
@@ -1291,5 +1192,5 @@ print("Page: M | Music: =")
 print("Stop: Backspace | Speed: [ ]")
 print("Favorite: F | Sprint: Hold LeftControl")
 print("Wheel: 1-8 keys or click Roblox emotes wheel")
-print("Chat: /dance <name> | /poop | /stop | /cv")
+print("Chat: /dance <name> | /poop | /sit | /unsit | /stop | /cv")
 print("==========================================")
