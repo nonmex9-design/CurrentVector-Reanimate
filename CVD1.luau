@@ -10,7 +10,22 @@ local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 
+local RESET_GUI_NAME = "refreshtestyescurrent"
 local FORCE_REFRESH = true
+
+local shared = (getgenv and getgenv()) or _G
+
+if shared.CurrentVectorCleanup then
+    print("[CurrentVector-Dances V1] Previous run detected, cleaning up...")
+    pcall(shared.CurrentVectorCleanup)
+    shared.CurrentVectorCleanup = nil
+end
+
+local existingResetGui = CoreGui:FindFirstChild(RESET_GUI_NAME)
+if existingResetGui then
+    print("[CurrentVector-Dances V1] Found stale reset GUI, destroying...")
+    existingResetGui:Destroy()
+end
 
 pcall(function()
     if isfolder and not isfolder("CurrentVector") then makefolder("CurrentVector") end
@@ -19,7 +34,8 @@ pcall(function()
 end)
 print("Ready!")
 
-local baseURL = "https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Animations/"
+local primaryBase = "https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CurrentVector/Animations/"
+local fallbackBase = "https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Animations/"
 local animList = {
     "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh", "Groovv",
     "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll",
@@ -28,27 +44,37 @@ local animList = {
 
 local function isValidRbxm(data)
     if not data or #data < 20 then return false end
-    if string.sub(data, 1, 7) == "<roblox" then return true end
     if string.sub(data, 1, 1) == "<" then return true end
     return false
 end
 
-local function downloadAnim(name)
-    local path = "CurrentVector/Animations/" .. name .. ".rbxm"
-    local url = baseURL .. name:gsub(" ", "%%20") .. ".rbxm"
-    print("[CurrentVector-Dances V1] Downloading " .. name .. " from " .. url)
-
+local function tryHttpGet(url)
     local ok, data = pcall(function()
         return game:HttpGet(url)
     end)
-    if not ok or not data then
-        warn("[CurrentVector-Dances V1] HTTP failed for " .. name .. ": " .. tostring(data))
+    if ok and data then return data end
+    return nil
+end
+
+local function downloadAnim(name)
+    local path = "CurrentVector/Animations/" .. name .. ".rbxm"
+    local encoded = name:gsub(" ", "%%20")
+
+    print("[CurrentVector-Dances V1] Downloading " .. name)
+    local data = tryHttpGet(primaryBase .. encoded .. ".rbxm")
+    if not data or not isValidRbxm(data) then
+        print("[CurrentVector-Dances V1] Primary URL failed for " .. name .. ", trying fallback...")
+        data = tryHttpGet(fallbackBase .. encoded .. ".rbxm")
+    end
+
+    if not data then
+        warn("[CurrentVector-Dances V1] " .. name .. " could not be fetched from either URL")
         return
     end
 
     if not isValidRbxm(data) then
-        warn("[CurrentVector-Dances V1] " .. name .. " is not a valid .rbxm. Size: " .. tostring(#data))
-        local preview = string.sub(data, 1, 120)
+        warn("[CurrentVector-Dances V1] " .. name .. " returned invalid data. Size: " .. tostring(#data))
+        local preview = string.sub(data, 1, 160)
         warn("[CurrentVector-Dances V1] Preview: " .. preview)
         return
     end
@@ -57,9 +83,9 @@ local function downloadAnim(name)
         writefile(path, data)
     end)
     if wrote then
-        print("[CurrentVector-Dances V1] Downloaded " .. name .. " (" .. tostring(#data) .. " bytes)")
+        print("[CurrentVector-Dances V1] OK " .. name .. " (" .. tostring(#data) .. " bytes)")
     else
-        warn("[CurrentVector-Dances V1] Failed to write " .. name)
+        warn("[CurrentVector-Dances V1] Write failed for " .. name)
     end
 end
 
@@ -67,8 +93,6 @@ for _, name in ipairs(animList) do
     local path = "CurrentVector/Animations/" .. name .. ".rbxm"
     if FORCE_REFRESH or not isfile(path) then
         downloadAnim(name)
-    else
-        print("[CurrentVector-Dances V1] Skipping " .. name .. " (already exists)")
     end
 end
 print("[CurrentVector-Dances V1] Animations ready")
@@ -118,7 +142,7 @@ local function customasset(id)
     local path = "CurrentVector/Music/" .. id
     if not isfile(path) then
         local ok = pcall(function()
-            writefile(path, game:HttpGet("https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Music/" .. id))
+            writefile(path, game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CurrentVector/Music/" .. id))
         end)
         if not ok then return "rbxassetid://1837879082" end
     end
@@ -357,13 +381,60 @@ music.Parent = SoundService
 local bgMusicOn = true
 
 local connections = {}
+local characterConn = nil
+local wheelHooked = false
+local wheelSlots = {}
 
 local function disconnectAll()
     for _, c in ipairs(connections) do
         pcall(function() c:Disconnect() end)
     end
     connections = {}
+    if characterConn then
+        pcall(function() characterConn:Disconnect() end)
+        characterConn = nil
+    end
 end
+
+local function fullCleanup()
+    print("[CurrentVector-Dances V1] Running full cleanup")
+    disconnectAll()
+    pcall(function() music:Stop() end)
+    pcall(function() music:Destroy() end)
+
+    local char = player.Character
+    if char then
+        local torso = char:FindFirstChild("Torso")
+        if torso then
+            local p = torso:FindFirstChild("CVParticles")
+            if p then p:Destroy() end
+        end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            pcall(function()
+                hum.PlatformStand = false
+                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+                hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+                hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+            end)
+        end
+    end
+
+    for k in pairs(LAST_POSE) do LAST_POSE[k] = nil end
+    for k in pairs(EXTRA_TILT) do EXTRA_TILT[k] = nil end
+
+    local resetGui = CoreGui:FindFirstChild(RESET_GUI_NAME)
+    if resetGui then resetGui:Destroy() end
+end
+
+shared.CurrentVectorCleanup = fullCleanup
+
+local resetGui = Instance.new("ScreenGui")
+resetGui.Name = RESET_GUI_NAME
+resetGui.ResetOnSpawn = false
+resetGui.IgnoreGuiInset = true
+resetGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+resetGui.Parent = CoreGui
 
 local function attachParticles(character)
     local torso = character:FindFirstChild("Torso")
@@ -397,8 +468,18 @@ local function removeParticles(character)
     end
 end
 
-local wheelHooked = false
-local wheelSlots = {}
+local function findKF(obj)
+    if not obj then return nil end
+    if obj:IsA("KeyframeSequence") then return obj end
+    if obj:IsA("Folder") or obj:IsA("Model") then
+        local found = obj:FindFirstChildOfClass("KeyframeSequence")
+        if found then return found end
+        for _, child in ipairs(obj:GetDescendants()) do
+            if child:IsA("KeyframeSequence") then return child end
+        end
+    end
+    return nil
+end
 
 local function loadKFForPreview(name)
     local path = "CurrentVector/Animations/" .. name .. ".rbxm"
@@ -409,10 +490,7 @@ local function loadKFForPreview(name)
         return InsertService:LoadLocalAsset(assetId)
     end)
     if not ok2 or not obj then return nil end
-    if obj:IsA("Model") then
-        obj = obj:FindFirstChildOfClass("KeyframeSequence")
-    end
-    return obj
+    return findKF(obj)
 end
 
 local function poseClone(clone, danceName)
@@ -500,7 +578,6 @@ local function refreshWheelPage(page)
     if wheelNavRef.pageLabel then
         wheelNavRef.pageLabel.Text = "Page " .. tostring(page) .. " / " .. tostring(wheelNavRef.total)
     end
-    print("[CurrentVector-Dances V1] Wheel refreshed for page " .. tostring(page))
 end
 
 local function hookRobloxEmoteWheel()
@@ -703,14 +780,12 @@ local function hookRobloxEmoteWheel()
     end)
 
     wheelHooked = true
-    print("[CurrentVector-Dances V1] Roblox emotes wheel hooked")
     refreshWheelPage(currentPage)
 end
 
 pcall(hookRobloxEmoteWheel)
 
 local function setupCharacter(character)
-    print("[CurrentVector-Dances V1] Setting up character")
     disconnectAll()
 
     local hum = character:WaitForChild("Humanoid")
@@ -764,10 +839,7 @@ local function setupCharacter(character)
             return InsertService:LoadLocalAsset(assetId)
         end)
         if not ok2 or not obj then return nil end
-        if obj:IsA("Model") then
-            obj = obj:FindFirstChildOfClass("KeyframeSequence")
-        end
-        return obj
+        return findKF(obj)
     end
 
     local function applyPlatformStand(state)
@@ -1202,7 +1274,6 @@ local function setupCharacter(character)
 
     playAnim("Idle", 1, true)
     if bgMusicOn then music:Play() end
-    print("[CurrentVector-Dances V1] Character ready")
     notify("CurrentVector-Dances V1 loaded")
 
     task.delay(1, function()
@@ -1210,7 +1281,7 @@ local function setupCharacter(character)
     end)
 end
 
-player.CharacterAdded:Connect(setupCharacter)
+characterConn = player.CharacterAdded:Connect(setupCharacter)
 if player.Character then setupCharacter(player.Character) end
 
 print("==========================================")
