@@ -370,6 +370,80 @@ local mobilePanel = nil
 local mobileSearchQuery = ""
 local mobileGrid = nil
 
+local activeBlur = nil
+local savedFov = nil
+local fovTween = nil
+local blurTween = nil
+local blurActiveCount = 0
+
+local function isAnyBlurActive()
+    if activeBlur ~= nil then return true end
+    if Lighting:FindFirstChild("CVWheelBlur") then return true end
+    return false
+end
+
+local function setBlurActive(on)
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+
+    if fovTween then pcall(function() fovTween:Cancel() end) fovTween = nil end
+    if blurTween then pcall(function() blurTween:Cancel() end) blurTween = nil end
+
+    if on then
+        blurActiveCount = blurActiveCount + 1
+        if blurActiveCount > 1 then return end
+
+        if not savedFov then
+            savedFov = cam.FieldOfView
+        end
+        if not activeBlur or not activeBlur.Parent then
+            activeBlur = Instance.new("BlurEffect")
+            activeBlur.Name = "CVWheelBlur"
+            activeBlur.Size = 0
+            activeBlur.Parent = Lighting
+        end
+
+        local targetFov = savedFov - 20
+        fovTween = TweenService:Create(cam,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { FieldOfView = targetFov }
+        )
+        fovTween:Play()
+
+        blurTween = TweenService:Create(activeBlur,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Size = 18 }
+        )
+        blurTween:Play()
+    else
+        blurActiveCount = blurActiveCount - 1
+        if blurActiveCount > 0 then return end
+        blurActiveCount = 0
+
+        local restoreFov = savedFov or 70
+        local blur = activeBlur
+        activeBlur = nil
+        savedFov = nil
+
+        fovTween = TweenService:Create(cam,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { FieldOfView = restoreFov }
+        )
+        fovTween:Play()
+
+        if blur then
+            blurTween = TweenService:Create(blur,
+                TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { Size = 0 }
+            )
+            blurTween:Play()
+            blurTween.Completed:Connect(function()
+                pcall(function() blur:Destroy() end)
+            end)
+        end
+    end
+end
+
 local function disconnectAll()
     for _, c in ipairs(connections) do
         pcall(function() c:Disconnect() end)
@@ -405,6 +479,12 @@ local function fullCleanup()
 
     for k in pairs(LAST_POSE) do LAST_POSE[k] = nil end
     for k in pairs(EXTRA_TILT) do EXTRA_TILT[k] = nil end
+
+    if fovTween then pcall(function() fovTween:Cancel() end) fovTween = nil end
+    if blurTween then pcall(function() blurTween:Cancel() end) blurTween = nil end
+    activeBlur = nil
+    savedFov = nil
+    blurActiveCount = 0
 
     local existingBlur2 = Lighting:FindFirstChild("CVWheelBlur")
     if existingBlur2 then existingBlur2:Destroy() end
@@ -583,35 +663,6 @@ local function refreshWheelPage()
             favBtnRef.btn.Text = "☆"
             favBtnRef.btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
-    end
-end
-
-local wheelBlur = nil
-local wheelSavedFov = nil
-
-local function setWheelEffects(on)
-    if on then
-        if not wheelBlur then
-            wheelBlur = Instance.new("BlurEffect")
-            wheelBlur.Name = "CVWheelBlur"
-            wheelBlur.Size = 18
-            wheelBlur.Parent = Lighting
-        end
-        local cam = workspace.CurrentCamera
-        if cam then
-            if not wheelSavedFov then wheelSavedFov = cam.FieldOfView end
-            cam.FieldOfView = wheelSavedFov - 20
-        end
-    else
-        if wheelBlur then
-            pcall(function() wheelBlur:Destroy() end)
-            wheelBlur = nil
-        end
-        local cam = workspace.CurrentCamera
-        if cam and wheelSavedFov then
-            cam.FieldOfView = wheelSavedFov
-        end
-        wheelSavedFov = nil
     end
 end
 
@@ -905,9 +956,9 @@ local function hookRobloxEmoteWheel()
 
     wheel:GetPropertyChangedSignal("Visible"):Connect(function()
         if wheel.Visible then
-            setWheelEffects(true)
+            setBlurActive(true)
         else
-            setWheelEffects(false)
+            setBlurActive(false)
             if searchBoxRef.box then searchBoxRef.box.Text = "" end
             searchQuery = ""
             inFavoritesView = false
@@ -916,7 +967,7 @@ local function hookRobloxEmoteWheel()
     end)
 
     if wheel.Visible then
-        setWheelEffects(true)
+        setBlurActive(true)
     end
 
     wheelHooked = true
@@ -924,35 +975,6 @@ local function hookRobloxEmoteWheel()
 end
 
 pcall(hookRobloxEmoteWheel)
-
-local mobileBlur = nil
-local mobileSavedFov = nil
-
-local function setMobileEffects(on)
-    if on then
-        if not mobileBlur then
-            mobileBlur = Instance.new("BlurEffect")
-            mobileBlur.Name = "CVWheelBlur"
-            mobileBlur.Size = 18
-            mobileBlur.Parent = Lighting
-        end
-        local cam = workspace.CurrentCamera
-        if cam then
-            if not mobileSavedFov then mobileSavedFov = cam.FieldOfView end
-            cam.FieldOfView = mobileSavedFov - 20
-        end
-    else
-        if mobileBlur then
-            pcall(function() mobileBlur:Destroy() end)
-            mobileBlur = nil
-        end
-        local cam = workspace.CurrentCamera
-        if cam and mobileSavedFov then
-            cam.FieldOfView = mobileSavedFov
-        end
-        mobileSavedFov = nil
-    end
-end
 
 local function buildMobileUI(character, ctx)
     local playerGui = player:WaitForChild("PlayerGui")
@@ -1274,7 +1296,7 @@ local function buildMobileUI(character, ctx)
 
     local function togglePanel()
         panel.Visible = not panel.Visible
-        setMobileEffects(panel.Visible)
+        setBlurActive(panel.Visible)
         if panel.Visible then
             rebuildMobileGrid(mobileSearchBox.Text)
         end
@@ -1282,8 +1304,18 @@ local function buildMobileUI(character, ctx)
 
     toggle.MouseButton1Click:Connect(togglePanel)
     toggle.TouchTap:Connect(togglePanel)
-    closeBtn.MouseButton1Click:Connect(function() panel.Visible = false; setMobileEffects(false) end)
-    closeBtn.TouchTap:Connect(function() panel.Visible = false; setMobileEffects(false) end)
+    closeBtn.MouseButton1Click:Connect(function()
+        if panel.Visible then
+            panel.Visible = false
+            setBlurActive(false)
+        end
+    end)
+    closeBtn.TouchTap:Connect(function()
+        if panel.Visible then
+            panel.Visible = false
+            setBlurActive(false)
+        end
+    end)
 
     rebuildMobileGrid("")
 end
@@ -1846,15 +1878,12 @@ local function setupCharacter(character)
         end
         EXTRA_TILT["Head"] = headLookTilt
 
-        if camera then
+        if camera and not isAnyBlurActive() then
             local targetFov = baseFov
-            local wheelOpen = (wheelBlur ~= nil) or (mobileBlur ~= nil)
-            if not wheelOpen then
-                if sprinting and moving and not isDancing and not walkingBackward then
-                    targetFov = baseFov + 10
-                end
-                camera.FieldOfView = camera.FieldOfView + (targetFov - camera.FieldOfView) * math.min(dt * 4, 1)
+            if sprinting and moving and not isDancing and not walkingBackward then
+                targetFov = baseFov + 10
             end
+            camera.FieldOfView = camera.FieldOfView + (targetFov - camera.FieldOfView) * math.min(dt * 4, 1)
         end
 
         if not isDancing and not inAir and moving and not walkingBackward then
