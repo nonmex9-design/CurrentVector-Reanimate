@@ -35,9 +35,9 @@ local primaryBase = "https://raw.githubusercontent.com/nonmex9-design/CurrentVec
 local fallbackBase = "https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Animations/"
 local animList = {
     "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh", "Groovv",
-    "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll",
+    "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Twerk",
     "Idle", "Walk", "Run", "WalkV2", "RunV2", "Jump", "Fall", "Land", "Poop",
-    "Sit2", "Sitting",
+    "Sit2", "Sitting", "PP", "Wave3",
 }
 
 local function isValidRbxm(data)
@@ -311,9 +311,9 @@ local function makeanimlibrary()
 end
 
 local wheelPages = {
-    { "Bang2", "Bang3", "Banged1", "Backflip", "BreakDance", "Floss", "Fresh", "Groovv" },
-    { "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Bang2", "Bang3", "Banged1", "Backflip" },
-    { "BreakDance", "Floss", "Fresh", "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll" },
+    { "Bang2", "Bang3", "Banged1", "Backflip", "BreakDance", "Floss", "Fresh", "Twerk" },
+    { "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Bang2", "Bang3", "Banged1" },
+    { "Backflip", "BreakDance", "Floss", "Fresh", "Twerk", "Groovv", "Kazotsky Kick (Spy)", "Parrot" },
 }
 
 local dancePages = {}
@@ -544,64 +544,89 @@ local function hookRobloxEmoteWheel()
     end)
     if not ok3 or not emotesButtons or not slotNumbers then return end
 
+    local slotPositions = {
+        UDim2.new(0.5, 0, 0.1125, 0),
+        UDim2.new(0.774, 0, 0.226, 0),
+        UDim2.new(0.8875, 0, 0.5, 0),
+        UDim2.new(0.774, 0, 0.774, 0),
+        UDim2.new(0.5, 0, 0.8875, 0),
+        UDim2.new(0.226, 0, 0.774, 0),
+        UDim2.new(0.1125, 0, 0.5, 0),
+        UDim2.new(0.226, 0, 0.226, 0),
+    }
+
     for i = 1, 8 do
         local img = emotesButtons:FindFirstChild(tostring(i))
-        if img and img:IsA("ImageLabel") then
-            img.ImageTransparency = 1
+
+        if not img or not img:IsA("ImageLabel") then
+            img = Instance.new("ImageLabel")
+            img.Name = tostring(i)
+            img.AnchorPoint = Vector2.new(0.5, 0.5)
+            img.Size = UDim2.new(0.15, 0, 0.15, 0)
+            img.Position = slotPositions[i]
             img.BackgroundTransparency = 1
-            for _, child in ipairs(img:GetChildren()) do
-                if string.sub(child.Name, 1, 2) == "CV" then child:Destroy() end
-            end
-
-            local viewport = Instance.new("ViewportFrame")
-            viewport.Name = "CVViewport"
-            viewport.Size = UDim2.fromScale(2.2, 2.2)
-            viewport.AnchorPoint = Vector2.new(0.5, 0.5)
-            viewport.Position = UDim2.fromScale(0.5, 0.4)
-            viewport.BackgroundTransparency = 1
-            viewport.LightDirection = Vector3.new(-1, -1, -1)
-            viewport.Ambient = Color3.fromRGB(180, 180, 180)
-            viewport.ZIndex = 5
-            viewport.Parent = img
-
-            local cam = Instance.new("Camera")
-            cam.FieldOfView = 50
-            cam.CFrame = CFrame.new(Vector3.new(0, -0.5, 5), Vector3.new(0, -0.5, 0))
-            cam.Parent = viewport
-            viewport.CurrentCamera = cam
-
-            local text = Instance.new("TextLabel")
-            text.Name = "CVText"
-            text.Size = UDim2.fromScale(2.0, 0.6)
-            text.AnchorPoint = Vector2.new(0.5, 0.5)
-            text.Position = UDim2.fromScale(0.5, 1.4)
-            text.BackgroundTransparency = 1
-            text.TextColor3 = Color3.fromRGB(255, 255, 255)
-            text.TextStrokeTransparency = 0.5
-            text.Font = Enum.Font.GothamBold
-            text.TextScaled = true
-            text.ZIndex = 6
-            text.Parent = img
-
-            local btn = Instance.new("TextButton")
-            btn.Name = "CVButton"
-            btn.Size = UDim2.fromScale(1.7, 1.7)
-            btn.AnchorPoint = Vector2.new(0.5, 0.5)
-            btn.Position = UDim2.fromScale(0.5, 0.5)
-            btn.BackgroundTransparency = 1
-            btn.Text = ""
-            btn.ZIndex = 10
-            btn.Parent = img
-
-            local slot = { img = img, viewport = viewport, text = text, button = btn, danceName = nil }
-            btn.MouseButton1Click:Connect(function()
-                if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
-            end)
-            btn.TouchTap:Connect(function()
-                if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
-            end)
-            wheelSlots[i] = slot
+            img.ImageTransparency = 1
+            img.ZIndex = 2
+            img.Parent = emotesButtons
+            local ar = Instance.new("UIAspectRatioConstraint")
+            ar.Parent = img
         end
+
+        img.ImageTransparency = 1
+        img.BackgroundTransparency = 1
+        for _, child in ipairs(img:GetChildren()) do
+            if string.sub(child.Name, 1, 2) == "CV" then child:Destroy() end
+        end
+
+        local viewport = Instance.new("ViewportFrame")
+        viewport.Name = "CVViewport"
+        viewport.Size = UDim2.fromScale(2.2, 2.2)
+        viewport.AnchorPoint = Vector2.new(0.5, 0.5)
+        viewport.Position = UDim2.fromScale(0.5, 0.4)
+        viewport.BackgroundTransparency = 1
+        viewport.LightDirection = Vector3.new(-1, -1, -1)
+        viewport.Ambient = Color3.fromRGB(180, 180, 180)
+        viewport.ZIndex = 5
+        viewport.Parent = img
+
+        local cam = Instance.new("Camera")
+        cam.FieldOfView = 50
+        cam.CFrame = CFrame.new(Vector3.new(0, -0.5, 5), Vector3.new(0, -0.5, 0))
+        cam.Parent = viewport
+        viewport.CurrentCamera = cam
+
+        local text = Instance.new("TextLabel")
+        text.Name = "CVText"
+        text.Size = UDim2.fromScale(2.0, 0.6)
+        text.AnchorPoint = Vector2.new(0.5, 0.5)
+        text.Position = UDim2.fromScale(0.5, 1.4)
+        text.BackgroundTransparency = 1
+        text.TextColor3 = Color3.fromRGB(255, 255, 255)
+        text.TextStrokeTransparency = 0.5
+        text.Font = Enum.Font.GothamBold
+        text.TextScaled = true
+        text.ZIndex = 6
+        text.Parent = img
+
+        local btn = Instance.new("TextButton")
+        btn.Name = "CVButton"
+        btn.Size = UDim2.fromScale(1.7, 1.7)
+        btn.AnchorPoint = Vector2.new(0.5, 0.5)
+        btn.Position = UDim2.fromScale(0.5, 0.5)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.ZIndex = 10
+        btn.Parent = img
+
+        local slot = { img = img, viewport = viewport, text = text, button = btn, danceName = nil }
+        btn.MouseButton1Click:Connect(function()
+            if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
+        end)
+        btn.TouchTap:Connect(function()
+            if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
+        end)
+        wheelSlots[i] = slot
+
         local num = slotNumbers:FindFirstChild(tostring(i))
         if num and num:IsA("TextLabel") then num.Text = tostring(i) end
     end
@@ -706,10 +731,7 @@ pcall(hookRobloxEmoteWheel)
 
 local function buildMobileUI(character, ctx)
     local playerGui = player:WaitForChild("PlayerGui")
-
-    if mobileGui then
-        pcall(function() mobileGui:Destroy() end)
-    end
+    if mobileGui then pcall(function() mobileGui:Destroy() end) end
 
     mobileGui = Instance.new("ScreenGui")
     mobileGui.Name = "CurrentVectorMobile"
@@ -744,8 +766,8 @@ local function buildMobileUI(character, ctx)
 
     local panel = Instance.new("Frame")
     panel.Name = "CVPanel"
-    panel.Size = UDim2.fromOffset(240, 320)
-    panel.Position = UDim2.new(0.5, -120, 0.5, -160)
+    panel.Size = UDim2.fromOffset(240, 420)
+    panel.Position = UDim2.new(0.5, -120, 0.5, -210)
     panel.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
     panel.BackgroundTransparency = 0.08
     panel.BorderSizePixel = 0
@@ -837,40 +859,34 @@ local function buildMobileUI(character, ctx)
         return b
     end
 
-    local dance1Btn, dance2Btn, dance3Btn, sitBtn, sprintBtn, stopBtn, speedDownBtn, speedUpBtn
-    local pageBtn, favBtn, musicBtn
-
-    dance1Btn = makeBtn("Dance 1", 1, Color3.fromRGB(60, 60, 120), function()
+    makeBtn("Dance 1", 1, Color3.fromRGB(60, 60, 120), function()
         local d = dancePages[currentPage][1]
         if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop()
-            else ctx.play(d) end
+            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
     end)
-    dance2Btn = makeBtn("Dance 2", 2, Color3.fromRGB(60, 60, 120), function()
+    makeBtn("Dance 2", 2, Color3.fromRGB(60, 60, 120), function()
         local d = dancePages[currentPage][2]
         if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop()
-            else ctx.play(d) end
+            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
     end)
-    dance3Btn = makeBtn("Dance 3", 3, Color3.fromRGB(60, 60, 120), function()
+    makeBtn("Dance 3", 3, Color3.fromRGB(60, 60, 120), function()
         local d = dancePages[currentPage][3]
         if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop()
-            else ctx.play(d) end
+            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
         end
     end)
-    pageBtn = makeBtn("Next Page", 4, Color3.fromRGB(45, 70, 100), function()
+    makeBtn("Next Page", 4, Color3.fromRGB(45, 70, 100), function()
         currentPage = currentPage + 1
         if currentPage > #wheelPages then currentPage = 1 end
         pageLabelMobile.Text = "Page " .. currentPage .. " / " .. #wheelPages
         refreshWheelPage(currentPage)
         notify("Page " .. currentPage)
     end)
-    sitBtn = makeBtn("Sit", 5, Color3.fromRGB(60, 90, 60), function()
+    local sitBtn = makeBtn("Sit", 5, Color3.fromRGB(60, 90, 60), function()
         if ctx.isSitting() then
-            ctx.stop()
+            ctx.unsit()
             sitBtn.Text = "Sit"
             notify("Stood up")
         else
@@ -879,53 +895,47 @@ local function buildMobileUI(character, ctx)
             notify("Sitting")
         end
     end)
-    sprintBtn = makeBtn("Sprint: OFF", 6, Color3.fromRGB(90, 60, 60), function()
+    local sprintBtn = makeBtn("Sprint: OFF", 6, Color3.fromRGB(90, 60, 60), function()
         ctx.toggleSprint()
         sprintBtn.Text = ctx.isSprinting() and "Sprint: ON" or "Sprint: OFF"
     end)
-    stopBtn = makeBtn("Stop", 7, Color3.fromRGB(120, 40, 50), function()
+    makeBtn("Stop", 7, Color3.fromRGB(120, 40, 50), function()
         ctx.stop()
         sitBtn.Text = "Sit"
         notify("Stopped")
     end)
-    speedDownBtn = makeBtn("Speed -", 8, Color3.fromRGB(70, 60, 90), function()
+    makeBtn("Speed -", 8, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.max(0.1, ctx.currentAnim().Speed - 0.1)
             notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
         end
     end)
-    speedUpBtn = makeBtn("Speed +", 9, Color3.fromRGB(70, 60, 90), function()
+    makeBtn("Speed +", 9, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.min(5, ctx.currentAnim().Speed + 0.1)
             notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
         end
     end)
-    musicBtn = makeBtn("Music: ON", 10, Color3.fromRGB(60, 80, 60), function()
+    local musicBtn = makeBtn("Music: ON", 10, Color3.fromRGB(60, 80, 60), function()
         bgMusicOn = not bgMusicOn
         if bgMusicOn then music:Play() notify("Music ON")
         else music:Stop() notify("Music OFF") end
         musicBtn.Text = bgMusicOn and "Music: ON" or "Music: OFF"
     end)
-    favBtn = makeBtn("Favorite", 11, Color3.fromRGB(90, 70, 40), function()
-        local name = ctx.getName()
-        if name and not (name == "Idle" or name == "WalkV2" or name == "RunV2") then
-            local added = toggleFavorite(name)
-            notify(added and ("Favorited " .. name) or ("Unfavorited " .. name))
-        end
+    makeBtn("PP", 11, Color3.fromRGB(90, 40, 90), function()
+        ctx.pp()
+    end)
+    makeBtn("Wave", 12, Color3.fromRGB(40, 90, 110), function()
+        ctx.wave()
+    end)
+    makeBtn("Twerk", 13, Color3.fromRGB(120, 60, 100), function()
+        ctx.twerk()
     end)
 
-    toggle.MouseButton1Click:Connect(function()
-        panel.Visible = not panel.Visible
-    end)
-    toggle.TouchTap:Connect(function()
-        panel.Visible = not panel.Visible
-    end)
-    closeBtn.MouseButton1Click:Connect(function()
-        panel.Visible = false
-    end)
-    closeBtn.TouchTap:Connect(function()
-        panel.Visible = false
-    end)
+    toggle.MouseButton1Click:Connect(function() panel.Visible = not panel.Visible end)
+    toggle.TouchTap:Connect(function() panel.Visible = not panel.Visible end)
+    closeBtn.MouseButton1Click:Connect(function() panel.Visible = false end)
+    closeBtn.TouchTap:Connect(function() panel.Visible = false end)
 end
 
 local function setupCharacter(character)
@@ -950,6 +960,7 @@ local function setupCharacter(character)
     local currentAnimName = nil
     local isDancing = false
     local isSitting = false
+    local isPPing = false
     local sprinting = false
     local inAir = false
     local jumpPlaying = false
@@ -1026,6 +1037,7 @@ local function setupCharacter(character)
         currentAnimName = nil
         isDancing = false
         isSitting = false
+        isPPing = false
         removeParticles(character)
         freezeInPlace(false)
         for _, m in pairs(rigTable) do
@@ -1039,12 +1051,14 @@ local function setupCharacter(character)
     local function playDance(name)
         isDancing = true
         isSitting = false
+        isPPing = false
         playAnim(name, 1, true, true)
     end
 
     local function playOnce(name)
         isDancing = true
         isSitting = false
+        isPPing = false
         playAnim(name, 1, false, true)
         local played = currentAnim
         if played then
@@ -1062,9 +1076,44 @@ local function setupCharacter(character)
         end
     end
 
+    local function playPP()
+        if isPPing then
+            stopDance()
+            return
+        end
+        isDancing = true
+        isSitting = false
+        isPPing = true
+        playAnim("PP", 1, true, false)
+    end
+
+    local function playWave()
+        isDancing = true
+        isSitting = false
+        isPPing = false
+        playAnim("Wave3", 1, false, false)
+        local waveAnim = currentAnim
+        if waveAnim then
+            waveAnim.OnStopped = function()
+                if currentAnim == waveAnim or currentAnim == nil then
+                    stopDance()
+                end
+            end
+        end
+    end
+
+    local function playTwerk()
+        if isDancing and currentAnimName == "Twerk" then
+            stopDance()
+            return
+        end
+        playDance("Twerk")
+    end
+
     local function playSit()
         isDancing = true
         isSitting = true
+        isPPing = false
 
         task.spawn(function()
             pcall(function() loadKF("Sitting") end)
@@ -1077,6 +1126,32 @@ local function setupCharacter(character)
                 if currentAnim == sitAnim or currentAnim == nil then
                     playAnim("Sitting", 1, true, true)
                     currentAnimName = "Sitting"
+                end
+            end
+        end
+    end
+
+    local function unsit()
+        if not isSitting then
+            notify("Not sitting")
+            return
+        end
+
+        isDancing = true
+        isSitting = false
+        isPPing = false
+
+        task.spawn(function()
+            pcall(function() loadKF("Sitting") end)
+        end)
+
+        playAnim("Sit2", -1, false, true)
+        local unsitAnim = currentAnim
+        if unsitAnim then
+            unsitAnim.TimePosition = unsitAnim.Length
+            unsitAnim.OnStopped = function()
+                if currentAnim == unsitAnim or currentAnim == nil then
+                    stopDance()
                 end
             end
         end
@@ -1141,6 +1216,10 @@ local function setupCharacter(character)
             play = playDance,
             stop = stopDance,
             sit = playSit,
+            unsit = unsit,
+            pp = playPP,
+            wave = playWave,
+            twerk = playTwerk,
             isDancing = isDancing,
             isSitting = function() return isSitting end,
             isSprinting = function() return sprinting end,
@@ -1200,6 +1279,11 @@ local function setupCharacter(character)
             return
         end
 
+        if key == "t" then
+            playTwerk()
+            return
+        end
+
         if key == "q" or key == "e" or key == "r" then
             local idx = (key == "q" and 1) or (key == "e" and 2) or 3
             local dance = dancePages[currentPage][idx]
@@ -1256,6 +1340,10 @@ local function setupCharacter(character)
         local lower = string.lower(msg)
         if string.sub(lower, 1, 7) == "/dance " then
             local name = string.sub(msg, 8)
+            if string.lower(name) == "twerk" or string.lower(name) == "tw" then
+                playTwerk()
+                return
+            end
             for _, d in ipairs(allDances) do
                 if string.lower(d) == string.lower(name) then
                     playDance(d)
@@ -1266,21 +1354,25 @@ local function setupCharacter(character)
         elseif lower == "/poop" then
             playOnce("Poop")
             notify("Poop!")
+        elseif lower == "/pp" then
+            playPP()
+            notify(isPPing and "PP ON" or "PP OFF")
+        elseif lower == "/wave" then
+            playWave()
+            notify("Waving")
+        elseif lower == "/tw" then
+            playTwerk()
+            notify("Twerking")
         elseif lower == "/sit" then
             if isSitting then
-                stopDance()
+                unsit()
                 notify("Stood up")
             else
                 playSit()
                 notify("Sitting")
             end
         elseif lower == "/unsit" then
-            if isSitting then
-                stopDance()
-                notify("Stood up")
-            else
-                notify("Not sitting")
-            end
+            unsit()
         elseif lower == "/stop" then
             stopDance()
         elseif lower == "/cv" then
@@ -1450,11 +1542,11 @@ print("[CurrentVector-Dances V1] Ready")
 if IS_MOBILE then
     print("Mobile: Tap the CV button to open the control panel")
 else
-    print("Dances: Q / E / R")
+    print("Dances: Q / E / R | Twerk: T")
     print("Page: M | Music: =")
     print("Stop: Backspace | Speed: [ ]")
     print("Favorite: F | Sprint: Hold LeftControl")
 end
-print("Wheel: 1-8 keys or click Roblox emotes wheel")
-print("Chat: /dance <name> | /poop | /sit | /unsit | /stop | /cv")
+print("Wheel: 1-8 keys or click Roblox emotes wheel (8 slots now)")
+print("Chat: /dance <name> | /poop | /pp | /wave | /tw | /sit | /unsit | /stop | /cv")
 print("==========================================")
