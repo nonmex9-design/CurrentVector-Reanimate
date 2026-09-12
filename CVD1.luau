@@ -9,6 +9,7 @@ local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
 
 local RESET_GUI_NAME = "refreshtestyescurrent"
 local FORCE_REFRESH = true
@@ -23,6 +24,9 @@ end
 
 local existingResetGui = CoreGui:FindFirstChild(RESET_GUI_NAME)
 if existingResetGui then existingResetGui:Destroy() end
+
+local existingBlur = Lighting:FindFirstChild("CVWheelBlur")
+if existingBlur then existingBlur:Destroy() end
 
 pcall(function()
     if isfolder and not isfolder("CurrentVector") then makefolder("CurrentVector") end
@@ -362,6 +366,9 @@ local characterConn = nil
 local wheelHooked = false
 local wheelSlots = {}
 local mobileGui = nil
+local mobilePanel = nil
+local mobileSearchQuery = ""
+local mobileGrid = nil
 
 local function disconnectAll()
     for _, c in ipairs(connections) do
@@ -399,11 +406,21 @@ local function fullCleanup()
     for k in pairs(LAST_POSE) do LAST_POSE[k] = nil end
     for k in pairs(EXTRA_TILT) do EXTRA_TILT[k] = nil end
 
+    local existingBlur2 = Lighting:FindFirstChild("CVWheelBlur")
+    if existingBlur2 then existingBlur2:Destroy() end
+
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam.FieldOfView = 70
+    end
+
     local rg = CoreGui:FindFirstChild(RESET_GUI_NAME)
     if rg then rg:Destroy() end
     if mobileGui then
         pcall(function() mobileGui:Destroy() end)
         mobileGui = nil
+        mobilePanel = nil
+        mobileGrid = nil
     end
 end
 
@@ -569,6 +586,35 @@ local function refreshWheelPage()
     end
 end
 
+local wheelBlur = nil
+local wheelSavedFov = nil
+
+local function setWheelEffects(on)
+    if on then
+        if not wheelBlur then
+            wheelBlur = Instance.new("BlurEffect")
+            wheelBlur.Name = "CVWheelBlur"
+            wheelBlur.Size = 18
+            wheelBlur.Parent = Lighting
+        end
+        local cam = workspace.CurrentCamera
+        if cam then
+            if not wheelSavedFov then wheelSavedFov = cam.FieldOfView end
+            cam.FieldOfView = wheelSavedFov - 20
+        end
+    else
+        if wheelBlur then
+            pcall(function() wheelBlur:Destroy() end)
+            wheelBlur = nil
+        end
+        local cam = workspace.CurrentCamera
+        if cam and wheelSavedFov then
+            cam.FieldOfView = wheelSavedFov
+        end
+        wheelSavedFov = nil
+    end
+end
+
 local function hookRobloxEmoteWheel()
     if wheelHooked then return end
     local ok1, RobloxGui = pcall(function() return CoreGui:WaitForChild("RobloxGui", 15) end)
@@ -692,6 +738,7 @@ local function hookRobloxEmoteWheel()
     searchFrame.BackgroundTransparency = 0.15
     searchFrame.BorderSizePixel = 0
     searchFrame.ZIndex = 30
+    searchFrame.Active = true
     searchFrame.Parent = topBar
     local sfCorner = Instance.new("UICorner")
     sfCorner.CornerRadius = UDim.new(0, 10)
@@ -725,6 +772,8 @@ local function hookRobloxEmoteWheel()
     searchBox.TextSize = 16
     searchBox.TextXAlignment = Enum.TextXAlignment.Left
     searchBox.ClearTextOnFocus = false
+    searchBox.TextEditable = true
+    searchBox.MultiLine = false
     searchBox.ZIndex = 31
     searchBox.Parent = searchFrame
 
@@ -759,14 +808,13 @@ local function hookRobloxEmoteWheel()
 
     favBtnRef.btn = favBtn
 
-    favBtn.MouseButton1Click:Connect(function()
+    local function toggleFavView()
         inFavoritesView = not inFavoritesView
         if wheelNavRef.refresh then wheelNavRef.refresh() end
-    end)
-    favBtn.TouchTap:Connect(function()
-        inFavoritesView = not inFavoritesView
-        if wheelNavRef.refresh then wheelNavRef.refresh() end
-    end)
+    end
+
+    favBtn.MouseButton1Click:Connect(toggleFavView)
+    favBtn.TouchTap:Connect(toggleFavView)
 
     local navFrame = Instance.new("Frame")
     navFrame.Name = "CVNav"
@@ -856,7 +904,10 @@ local function hookRobloxEmoteWheel()
     forwardBtn.MouseLeave:Connect(function() forwardBtn.BackgroundTransparency = 0.3 end)
 
     wheel:GetPropertyChangedSignal("Visible"):Connect(function()
-        if not wheel.Visible then
+        if wheel.Visible then
+            setWheelEffects(true)
+        else
+            setWheelEffects(false)
             if searchBoxRef.box then searchBoxRef.box.Text = "" end
             searchQuery = ""
             inFavoritesView = false
@@ -864,11 +915,44 @@ local function hookRobloxEmoteWheel()
         end
     end)
 
+    if wheel.Visible then
+        setWheelEffects(true)
+    end
+
     wheelHooked = true
     refreshWheelPage()
 end
 
 pcall(hookRobloxEmoteWheel)
+
+local mobileBlur = nil
+local mobileSavedFov = nil
+
+local function setMobileEffects(on)
+    if on then
+        if not mobileBlur then
+            mobileBlur = Instance.new("BlurEffect")
+            mobileBlur.Name = "CVWheelBlur"
+            mobileBlur.Size = 18
+            mobileBlur.Parent = Lighting
+        end
+        local cam = workspace.CurrentCamera
+        if cam then
+            if not mobileSavedFov then mobileSavedFov = cam.FieldOfView end
+            cam.FieldOfView = mobileSavedFov - 20
+        end
+    else
+        if mobileBlur then
+            pcall(function() mobileBlur:Destroy() end)
+            mobileBlur = nil
+        end
+        local cam = workspace.CurrentCamera
+        if cam and mobileSavedFov then
+            cam.FieldOfView = mobileSavedFov
+        end
+        mobileSavedFov = nil
+    end
+end
 
 local function buildMobileUI(character, ctx)
     local playerGui = player:WaitForChild("PlayerGui")
@@ -884,8 +968,8 @@ local function buildMobileUI(character, ctx)
 
     local toggle = Instance.new("TextButton")
     toggle.Name = "CVToggle"
-    toggle.Size = UDim2.fromOffset(56, 56)
-    toggle.Position = UDim2.new(1, -70, 0.5, -28)
+    toggle.Size = UDim2.fromOffset(60, 60)
+    toggle.Position = UDim2.new(1, -76, 0.5, -30)
     toggle.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
     toggle.BackgroundTransparency = 0.15
     toggle.BorderSizePixel = 0
@@ -907,15 +991,16 @@ local function buildMobileUI(character, ctx)
 
     local panel = Instance.new("Frame")
     panel.Name = "CVPanel"
-    panel.Size = UDim2.fromOffset(240, 420)
-    panel.Position = UDim2.new(0.5, -120, 0.5, -210)
+    panel.Size = UDim2.new(0, 340, 0, 520)
+    panel.Position = UDim2.new(0.5, -170, 0.5, -260)
     panel.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
-    panel.BackgroundTransparency = 0.08
+    panel.BackgroundTransparency = 0.05
     panel.BorderSizePixel = 0
     panel.Visible = false
     panel.ZIndex = 99
     panel.Active = true
     panel.Parent = mobileGui
+    mobilePanel = panel
     local pCorner = Instance.new("UICorner")
     pCorner.CornerRadius = UDim.new(0, 14)
     pCorner.Parent = panel
@@ -926,59 +1011,114 @@ local function buildMobileUI(character, ctx)
 
     local titleBar = Instance.new("TextLabel")
     titleBar.Name = "Title"
-    titleBar.Size = UDim2.new(1, 0, 0, 32)
-    titleBar.Position = UDim2.new(0, 0, 0, 6)
+    titleBar.Size = UDim2.new(1, -50, 0, 30)
+    titleBar.Position = UDim2.new(0, 12, 0, 8)
     titleBar.BackgroundTransparency = 1
     titleBar.Text = "CurrentVector"
     titleBar.TextColor3 = Color3.fromRGB(235, 235, 245)
     titleBar.Font = Enum.Font.GothamBold
-    titleBar.TextScaled = true
+    titleBar.TextSize = 22
+    titleBar.TextXAlignment = Enum.TextXAlignment.Left
     titleBar.ZIndex = 101
     titleBar.Parent = panel
 
     local closeBtn = Instance.new("TextButton")
     closeBtn.Name = "Close"
-    closeBtn.Size = UDim2.fromOffset(32, 32)
-    closeBtn.Position = UDim2.new(1, -40, 0, 8)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 40)
+    closeBtn.Size = UDim2.fromOffset(36, 36)
+    closeBtn.Position = UDim2.new(1, -44, 0, 6)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(140, 35, 45)
     closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "X"
+    closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextScaled = true
+    closeBtn.TextSize = 20
     closeBtn.ZIndex = 102
     closeBtn.Parent = panel
     local cCorner = Instance.new("UICorner")
     cCorner.CornerRadius = UDim.new(0, 8)
     cCorner.Parent = closeBtn
 
-    local pageLabelMobile = Instance.new("TextLabel")
-    pageLabelMobile.Name = "PageLabel"
-    pageLabelMobile.Size = UDim2.new(1, -20, 0, 24)
-    pageLabelMobile.Position = UDim2.new(0, 10, 0, 42)
-    pageLabelMobile.BackgroundTransparency = 1
-    pageLabelMobile.Text = "Page 1 / " .. tostring(#wheelPages)
-    pageLabelMobile.TextColor3 = Color3.fromRGB(200, 200, 220)
-    pageLabelMobile.Font = Enum.Font.GothamBold
-    pageLabelMobile.TextScaled = true
-    pageLabelMobile.ZIndex = 101
-    pageLabelMobile.Parent = panel
+    local searchFrame = Instance.new("Frame")
+    searchFrame.Name = "SearchFrame"
+    searchFrame.Size = UDim2.new(1, -24, 0, 40)
+    searchFrame.Position = UDim2.new(0, 12, 0, 52)
+    searchFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+    searchFrame.BorderSizePixel = 0
+    searchFrame.ZIndex = 101
+    searchFrame.Active = true
+    searchFrame.Parent = panel
+    local sfCorner = Instance.new("UICorner")
+    sfCorner.CornerRadius = UDim.new(0, 10)
+    sfCorner.Parent = searchFrame
+    local sfStroke = Instance.new("UIStroke")
+    sfStroke.Color = Color3.fromRGB(80, 80, 120)
+    sfStroke.Thickness = 2
+    sfStroke.Parent = searchFrame
 
-    local grid = Instance.new("Frame")
-    grid.Name = "Grid"
-    grid.Size = UDim2.new(1, -20, 1, -110)
-    grid.Position = UDim2.new(0, 10, 0, 72)
-    grid.BackgroundTransparency = 1
-    grid.ZIndex = 101
-    grid.Parent = panel
+    local searchIcon = Instance.new("TextLabel")
+    searchIcon.Size = UDim2.new(0, 34, 1, 0)
+    searchIcon.Position = UDim2.new(0, 6, 0, 0)
+    searchIcon.BackgroundTransparency = 1
+    searchIcon.Text = "🔍"
+    searchIcon.TextColor3 = Color3.fromRGB(180, 180, 200)
+    searchIcon.Font = Enum.Font.GothamBold
+    searchIcon.TextSize = 20
+    searchIcon.ZIndex = 102
+    searchIcon.Parent = searchFrame
 
-    local layout = Instance.new("UIGridLayout")
-    layout.CellSize = UDim2.new(0.5, -6, 0, 42)
-    layout.CellPadding = UDim2.new(0, 10, 0, 8)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = grid
+    local mobileSearchBox = Instance.new("TextBox")
+    mobileSearchBox.Name = "SearchInput"
+    mobileSearchBox.Size = UDim2.new(1, -50, 1, 0)
+    mobileSearchBox.Position = UDim2.new(0, 42, 0, 0)
+    mobileSearchBox.BackgroundTransparency = 1
+    mobileSearchBox.Text = ""
+    mobileSearchBox.PlaceholderText = "Search emotes..."
+    mobileSearchBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 155)
+    mobileSearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mobileSearchBox.Font = Enum.Font.Gotham
+    mobileSearchBox.TextSize = 16
+    mobileSearchBox.TextXAlignment = Enum.TextXAlignment.Left
+    mobileSearchBox.ClearTextOnFocus = false
+    mobileSearchBox.TextEditable = true
+    mobileSearchBox.MultiLine = false
+    mobileSearchBox.ZIndex = 102
+    mobileSearchBox.Parent = searchFrame
 
-    local function makeBtn(text, order, color, onClick)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Name = "EmoteScroll"
+    scroll.Size = UDim2.new(1, -24, 0, 240)
+    scroll.Position = UDim2.new(0, 12, 0, 100)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 6
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 130)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.ZIndex = 101
+    scroll.Parent = panel
+
+    local scrollLayout = Instance.new("UIGridLayout")
+    scrollLayout.CellSize = UDim2.new(0.5, -6, 0, 44)
+    scrollLayout.CellPadding = UDim2.new(0, 8, 0, 8)
+    scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    scrollLayout.Parent = scroll
+    mobileGrid = scrollLayout
+
+    local controlsFrame = Instance.new("Frame")
+    controlsFrame.Name = "Controls"
+    controlsFrame.Size = UDim2.new(1, -24, 0, 155)
+    controlsFrame.Position = UDim2.new(0, 12, 1, -167)
+    controlsFrame.BackgroundTransparency = 1
+    controlsFrame.ZIndex = 101
+    controlsFrame.Parent = panel
+
+    local ctrlLayout = Instance.new("UIGridLayout")
+    ctrlLayout.CellSize = UDim2.new(0.333, -6, 0, 36)
+    ctrlLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+    ctrlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ctrlLayout.Parent = controlsFrame
+
+    local function makeCtrl(text, order, color, onClick)
         local b = Instance.new("TextButton")
         b.Name = text:gsub("%s", "")
         b.LayoutOrder = order
@@ -991,7 +1131,7 @@ local function buildMobileUI(character, ctx)
         b.TextScaled = true
         b.TextWrapped = true
         b.ZIndex = 102
-        b.Parent = grid
+        b.Parent = controlsFrame
         local cor = Instance.new("UICorner")
         cor.CornerRadius = UDim.new(0, 8)
         cor.Parent = b
@@ -1000,32 +1140,7 @@ local function buildMobileUI(character, ctx)
         return b
     end
 
-    makeBtn("Dance 1", 1, Color3.fromRGB(60, 60, 120), function()
-        local d = wheelPages[currentPage] and wheelPages[currentPage][1]
-        if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
-        end
-    end)
-    makeBtn("Dance 2", 2, Color3.fromRGB(60, 60, 120), function()
-        local d = wheelPages[currentPage] and wheelPages[currentPage][2]
-        if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
-        end
-    end)
-    makeBtn("Dance 3", 3, Color3.fromRGB(60, 60, 120), function()
-        local d = wheelPages[currentPage] and wheelPages[currentPage][3]
-        if d then
-            if ctx.isDancing and ctx.getName() == d then ctx.stop() else ctx.play(d) end
-        end
-    end)
-    makeBtn("Next Page", 4, Color3.fromRGB(45, 70, 100), function()
-        currentPage = currentPage + 1
-        if currentPage > #wheelPages then currentPage = 1 end
-        pageLabelMobile.Text = "Page " .. currentPage .. " / " .. #wheelPages
-        refreshWheelPage()
-        notify("Page " .. currentPage)
-    end)
-    local sitBtn = makeBtn("Sit", 5, Color3.fromRGB(60, 90, 60), function()
+    local sitBtn = makeCtrl("Sit", 1, Color3.fromRGB(60, 90, 60), function()
         if ctx.isSitting() then
             ctx.unsit()
             sitBtn.Text = "Sit"
@@ -1036,47 +1151,141 @@ local function buildMobileUI(character, ctx)
             notify("Sitting")
         end
     end)
-    local sprintBtn = makeBtn("Sprint: OFF", 6, Color3.fromRGB(90, 60, 60), function()
+    local sprintBtn = makeCtrl("Sprint", 2, Color3.fromRGB(90, 60, 60), function()
         ctx.toggleSprint()
-        sprintBtn.Text = ctx.isSprinting() and "Sprint: ON" or "Sprint: OFF"
+        sprintBtn.Text = ctx.isSprinting() and "Sprint ON" or "Sprint"
     end)
-    makeBtn("Stop", 7, Color3.fromRGB(120, 40, 50), function()
+    makeCtrl("Stop", 3, Color3.fromRGB(120, 40, 50), function()
         ctx.stop()
         sitBtn.Text = "Sit"
         notify("Stopped")
     end)
-    makeBtn("Speed -", 8, Color3.fromRGB(70, 60, 90), function()
+    makeCtrl("PP", 4, Color3.fromRGB(90, 40, 90), function()
+        ctx.pp()
+    end)
+    makeCtrl("Wave", 5, Color3.fromRGB(40, 90, 110), function()
+        ctx.wave()
+    end)
+    makeCtrl("Twerk", 6, Color3.fromRGB(120, 60, 100), function()
+        ctx.twerk()
+    end)
+    makeCtrl("Speed -", 7, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.max(0.1, ctx.currentAnim().Speed - 0.1)
             notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
         end
     end)
-    makeBtn("Speed +", 9, Color3.fromRGB(70, 60, 90), function()
+    makeCtrl("Speed +", 8, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.min(5, ctx.currentAnim().Speed + 0.1)
             notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
         end
     end)
-    local musicBtn = makeBtn("Music: ON", 10, Color3.fromRGB(60, 80, 60), function()
+    local musicBtn = makeCtrl("Music ON", 9, Color3.fromRGB(60, 80, 60), function()
         bgMusicOn = not bgMusicOn
         if bgMusicOn then music:Play() notify("Music ON")
         else music:Stop() notify("Music OFF") end
-        musicBtn.Text = bgMusicOn and "Music: ON" or "Music: OFF"
+        musicBtn.Text = bgMusicOn and "Music ON" or "Music OFF"
     end)
-    makeBtn("PP", 11, Color3.fromRGB(90, 40, 90), function()
-        ctx.pp()
+    makeCtrl("Favorite", 10, Color3.fromRGB(90, 70, 40), function()
+        local name = ctx.getName()
+        if name and not (name == "Idle" or name == "WalkV2" or name == "RunV2") then
+            local added = toggleFavorite(name)
+            notify(added and ("Favorited " .. name) or ("Unfavorited " .. name))
+            if searchQuery == "" and not inFavoritesView then
+                rebuildMobileGrid("")
+            end
+        end
     end)
-    makeBtn("Wave", 12, Color3.fromRGB(40, 90, 110), function()
-        ctx.wave()
+    makeCtrl("Random", 11, Color3.fromRGB(80, 60, 120), function()
+        if #allDances > 0 then
+            local pick = allDances[math.random(1, #allDances)]
+            if ctx.isDancing and ctx.getName() == pick then ctx.stop() else ctx.play(pick) end
+        end
     end)
-    makeBtn("Twerk", 13, Color3.fromRGB(120, 60, 100), function()
-        ctx.twerk()
+    makeCtrl("Favs", 12, Color3.fromRGB(80, 90, 40), function()
+        inFavoritesView = not inFavoritesView
+        rebuildMobileGrid(mobileSearchBox.Text)
     end)
 
-    toggle.MouseButton1Click:Connect(function() panel.Visible = not panel.Visible end)
-    toggle.TouchTap:Connect(function() panel.Visible = not panel.Visible end)
-    closeBtn.MouseButton1Click:Connect(function() panel.Visible = false end)
-    closeBtn.TouchTap:Connect(function() panel.Visible = false end)
+    function rebuildMobileGrid(filter)
+        mobileSearchQuery = filter or ""
+        for _, child in ipairs(scroll:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+
+        local list
+        if inFavoritesView then
+            list = favorites
+        elseif mobileSearchQuery ~= "" then
+            list = {}
+            local q = string.lower(mobileSearchQuery)
+            for _, name in ipairs(allDances) do
+                if string.find(string.lower(name), q, 1, true) then
+                    table.insert(list, name)
+                end
+            end
+        else
+            list = allDances
+        end
+
+        for i, name in ipairs(list) do
+            local b = Instance.new("TextButton")
+            b.Name = "Emote_" .. name
+            b.LayoutOrder = i
+            b.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
+            b.BackgroundTransparency = 0.05
+            b.BorderSizePixel = 0
+            b.Text = name
+            b.TextColor3 = Color3.fromRGB(255, 255, 255)
+            b.Font = Enum.Font.GothamBold
+            b.TextScaled = true
+            b.TextWrapped = true
+            b.ZIndex = 102
+            b.Parent = scroll
+            local cor = Instance.new("UICorner")
+            cor.CornerRadius = UDim.new(0, 8)
+            cor.Parent = b
+            if isFavorite(name) then
+                local star = Instance.new("TextLabel")
+                star.Size = UDim2.new(0, 16, 0, 16)
+                star.Position = UDim2.new(1, -20, 0, 4)
+                star.BackgroundTransparency = 1
+                star.Text = "★"
+                star.TextColor3 = Color3.fromRGB(255, 200, 60)
+                star.Font = Enum.Font.GothamBold
+                star.TextScaled = true
+                star.ZIndex = 103
+                star.Parent = b
+            end
+            b.MouseButton1Click:Connect(function()
+                if ctx.isDancing and ctx.getName() == name then ctx.stop() else ctx.play(name) end
+            end)
+            b.TouchTap:Connect(function()
+                if ctx.isDancing and ctx.getName() == name then ctx.stop() else ctx.play(name) end
+            end)
+        end
+    end
+
+    mobileSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        inFavoritesView = false
+        rebuildMobileGrid(mobileSearchBox.Text)
+    end)
+
+    local function togglePanel()
+        panel.Visible = not panel.Visible
+        setMobileEffects(panel.Visible)
+        if panel.Visible then
+            rebuildMobileGrid(mobileSearchBox.Text)
+        end
+    end
+
+    toggle.MouseButton1Click:Connect(togglePanel)
+    toggle.TouchTap:Connect(togglePanel)
+    closeBtn.MouseButton1Click:Connect(function() panel.Visible = false; setMobileEffects(false) end)
+    closeBtn.TouchTap:Connect(function() panel.Visible = false; setMobileEffects(false) end)
+
+    rebuildMobileGrid("")
 end
 
 local function setupCharacter(character)
@@ -1639,10 +1848,13 @@ local function setupCharacter(character)
 
         if camera then
             local targetFov = baseFov
-            if sprinting and moving and not isDancing and not walkingBackward then
-                targetFov = baseFov + 10
+            local wheelOpen = (wheelBlur ~= nil) or (mobileBlur ~= nil)
+            if not wheelOpen then
+                if sprinting and moving and not isDancing and not walkingBackward then
+                    targetFov = baseFov + 10
+                end
+                camera.FieldOfView = camera.FieldOfView + (targetFov - camera.FieldOfView) * math.min(dt * 4, 1)
             end
-            camera.FieldOfView = camera.FieldOfView + (targetFov - camera.FieldOfView) * math.min(dt * 4, 1)
         end
 
         if not isDancing and not inAir and moving and not walkingBackward then
@@ -1682,7 +1894,8 @@ if player.Character then setupCharacter(player.Character) end
 print("==========================================")
 print("[CurrentVector-Dances V1] Ready")
 if IS_MOBILE then
-    print("Mobile: Tap the CV button to open the control panel")
+    print("Mobile: Tap the CV button to open the mobile panel")
+    print("Mobile has search bar, emote list, and full controls")
 else
     print("Dances: Q / E / R | Twerk: T")
     print("Page: M | Music: =")
