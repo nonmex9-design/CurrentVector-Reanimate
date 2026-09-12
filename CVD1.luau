@@ -12,6 +12,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local RESET_GUI_NAME = "refreshtestyescurrent"
 local FORCE_REFRESH = true
+local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 local shared = (getgenv and getgenv()) or _G
 
@@ -353,6 +354,7 @@ local connections = {}
 local characterConn = nil
 local wheelHooked = false
 local wheelSlots = {}
+local mobileGui = nil
 
 local function disconnectAll()
     for _, c in ipairs(connections) do
@@ -392,6 +394,10 @@ local function fullCleanup()
 
     local rg = CoreGui:FindFirstChild(RESET_GUI_NAME)
     if rg then rg:Destroy() end
+    if mobileGui then
+        pcall(function() mobileGui:Destroy() end)
+        mobileGui = nil
+    end
 end
 
 shared.CurrentVectorCleanup = fullCleanup
@@ -591,6 +597,9 @@ local function hookRobloxEmoteWheel()
             btn.MouseButton1Click:Connect(function()
                 if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
             end)
+            btn.TouchTap:Connect(function()
+                if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
+            end)
             wheelSlots[i] = slot
         end
         local num = slotNumbers:FindFirstChild(tostring(i))
@@ -674,6 +683,16 @@ local function hookRobloxEmoteWheel()
         if currentPage > #wheelPages then currentPage = 1 end
         refreshWheelPage(currentPage)
     end)
+    backBtn.TouchTap:Connect(function()
+        currentPage = currentPage - 1
+        if currentPage < 1 then currentPage = #wheelPages end
+        refreshWheelPage(currentPage)
+    end)
+    forwardBtn.TouchTap:Connect(function()
+        currentPage = currentPage + 1
+        if currentPage > #wheelPages then currentPage = 1 end
+        refreshWheelPage(currentPage)
+    end)
     backBtn.MouseEnter:Connect(function() backBtn.BackgroundTransparency = 0 end)
     backBtn.MouseLeave:Connect(function() backBtn.BackgroundTransparency = 0.3 end)
     forwardBtn.MouseEnter:Connect(function() forwardBtn.BackgroundTransparency = 0 end)
@@ -684,6 +703,230 @@ local function hookRobloxEmoteWheel()
 end
 
 pcall(hookRobloxEmoteWheel)
+
+local function buildMobileUI(character, ctx)
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    if mobileGui then
+        pcall(function() mobileGui:Destroy() end)
+    end
+
+    mobileGui = Instance.new("ScreenGui")
+    mobileGui.Name = "CurrentVectorMobile"
+    mobileGui.ResetOnSpawn = false
+    mobileGui.IgnoreGuiInset = true
+    mobileGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    mobileGui.DisplayOrder = 100
+    mobileGui.Parent = playerGui
+
+    local toggle = Instance.new("TextButton")
+    toggle.Name = "CVToggle"
+    toggle.Size = UDim2.fromOffset(56, 56)
+    toggle.Position = UDim2.new(1, -70, 0.5, -28)
+    toggle.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    toggle.BackgroundTransparency = 0.15
+    toggle.BorderSizePixel = 0
+    toggle.Text = "CV"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextScaled = true
+    toggle.ZIndex = 100
+    toggle.Active = true
+    toggle.Draggable = true
+    toggle.Parent = mobileGui
+    local tCorner = Instance.new("UICorner")
+    tCorner.CornerRadius = UDim.new(1, 0)
+    tCorner.Parent = toggle
+    local tStroke = Instance.new("UIStroke")
+    tStroke.Color = Color3.fromRGB(90, 90, 130)
+    tStroke.Thickness = 2
+    tStroke.Parent = toggle
+
+    local panel = Instance.new("Frame")
+    panel.Name = "CVPanel"
+    panel.Size = UDim2.fromOffset(240, 320)
+    panel.Position = UDim2.new(0.5, -120, 0.5, -160)
+    panel.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+    panel.BackgroundTransparency = 0.08
+    panel.BorderSizePixel = 0
+    panel.Visible = false
+    panel.ZIndex = 99
+    panel.Active = true
+    panel.Parent = mobileGui
+    local pCorner = Instance.new("UICorner")
+    pCorner.CornerRadius = UDim.new(0, 14)
+    pCorner.Parent = panel
+    local pStroke = Instance.new("UIStroke")
+    pStroke.Color = Color3.fromRGB(80, 80, 120)
+    pStroke.Thickness = 2
+    pStroke.Parent = panel
+
+    local titleBar = Instance.new("TextLabel")
+    titleBar.Name = "Title"
+    titleBar.Size = UDim2.new(1, 0, 0, 32)
+    titleBar.Position = UDim2.new(0, 0, 0, 6)
+    titleBar.BackgroundTransparency = 1
+    titleBar.Text = "CurrentVector"
+    titleBar.TextColor3 = Color3.fromRGB(235, 235, 245)
+    titleBar.Font = Enum.Font.GothamBold
+    titleBar.TextScaled = true
+    titleBar.ZIndex = 101
+    titleBar.Parent = panel
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "Close"
+    closeBtn.Size = UDim2.fromOffset(32, 32)
+    closeBtn.Position = UDim2.new(1, -40, 0, 8)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 40)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextScaled = true
+    closeBtn.ZIndex = 102
+    closeBtn.Parent = panel
+    local cCorner = Instance.new("UICorner")
+    cCorner.CornerRadius = UDim.new(0, 8)
+    cCorner.Parent = closeBtn
+
+    local pageLabelMobile = Instance.new("TextLabel")
+    pageLabelMobile.Name = "PageLabel"
+    pageLabelMobile.Size = UDim2.new(1, -20, 0, 24)
+    pageLabelMobile.Position = UDim2.new(0, 10, 0, 42)
+    pageLabelMobile.BackgroundTransparency = 1
+    pageLabelMobile.Text = "Page 1 / " .. tostring(#wheelPages)
+    pageLabelMobile.TextColor3 = Color3.fromRGB(200, 200, 220)
+    pageLabelMobile.Font = Enum.Font.GothamBold
+    pageLabelMobile.TextScaled = true
+    pageLabelMobile.ZIndex = 101
+    pageLabelMobile.Parent = panel
+
+    local grid = Instance.new("Frame")
+    grid.Name = "Grid"
+    grid.Size = UDim2.new(1, -20, 1, -110)
+    grid.Position = UDim2.new(0, 10, 0, 72)
+    grid.BackgroundTransparency = 1
+    grid.ZIndex = 101
+    grid.Parent = panel
+
+    local layout = Instance.new("UIGridLayout")
+    layout.CellSize = UDim2.new(0.5, -6, 0, 42)
+    layout.CellPadding = UDim2.new(0, 10, 0, 8)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = grid
+
+    local function makeBtn(text, order, color, onClick)
+        local b = Instance.new("TextButton")
+        b.Name = text:gsub("%s", "")
+        b.LayoutOrder = order
+        b.BackgroundColor3 = color or Color3.fromRGB(45, 45, 65)
+        b.BackgroundTransparency = 0.05
+        b.BorderSizePixel = 0
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Font = Enum.Font.GothamBold
+        b.TextScaled = true
+        b.TextWrapped = true
+        b.ZIndex = 102
+        b.Parent = grid
+        local cor = Instance.new("UICorner")
+        cor.CornerRadius = UDim.new(0, 8)
+        cor.Parent = b
+        b.MouseButton1Click:Connect(onClick)
+        b.TouchTap:Connect(onClick)
+        return b
+    end
+
+    local dance1Btn, dance2Btn, dance3Btn, sitBtn, sprintBtn, stopBtn, speedDownBtn, speedUpBtn
+    local pageBtn, favBtn, musicBtn
+
+    dance1Btn = makeBtn("Dance 1", 1, Color3.fromRGB(60, 60, 120), function()
+        local d = dancePages[currentPage][1]
+        if d then
+            if ctx.isDancing and ctx.getName() == d then ctx.stop()
+            else ctx.play(d) end
+        end
+    end)
+    dance2Btn = makeBtn("Dance 2", 2, Color3.fromRGB(60, 60, 120), function()
+        local d = dancePages[currentPage][2]
+        if d then
+            if ctx.isDancing and ctx.getName() == d then ctx.stop()
+            else ctx.play(d) end
+        end
+    end)
+    dance3Btn = makeBtn("Dance 3", 3, Color3.fromRGB(60, 60, 120), function()
+        local d = dancePages[currentPage][3]
+        if d then
+            if ctx.isDancing and ctx.getName() == d then ctx.stop()
+            else ctx.play(d) end
+        end
+    end)
+    pageBtn = makeBtn("Next Page", 4, Color3.fromRGB(45, 70, 100), function()
+        currentPage = currentPage + 1
+        if currentPage > #wheelPages then currentPage = 1 end
+        pageLabelMobile.Text = "Page " .. currentPage .. " / " .. #wheelPages
+        refreshWheelPage(currentPage)
+        notify("Page " .. currentPage)
+    end)
+    sitBtn = makeBtn("Sit", 5, Color3.fromRGB(60, 90, 60), function()
+        if ctx.isSitting() then
+            ctx.stop()
+            sitBtn.Text = "Sit"
+            notify("Stood up")
+        else
+            ctx.sit()
+            sitBtn.Text = "Unsit"
+            notify("Sitting")
+        end
+    end)
+    sprintBtn = makeBtn("Sprint: OFF", 6, Color3.fromRGB(90, 60, 60), function()
+        ctx.toggleSprint()
+        sprintBtn.Text = ctx.isSprinting() and "Sprint: ON" or "Sprint: OFF"
+    end)
+    stopBtn = makeBtn("Stop", 7, Color3.fromRGB(120, 40, 50), function()
+        ctx.stop()
+        sitBtn.Text = "Sit"
+        notify("Stopped")
+    end)
+    speedDownBtn = makeBtn("Speed -", 8, Color3.fromRGB(70, 60, 90), function()
+        if ctx.currentAnim() then
+            ctx.currentAnim().Speed = math.max(0.1, ctx.currentAnim().Speed - 0.1)
+            notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
+        end
+    end)
+    speedUpBtn = makeBtn("Speed +", 9, Color3.fromRGB(70, 60, 90), function()
+        if ctx.currentAnim() then
+            ctx.currentAnim().Speed = math.min(5, ctx.currentAnim().Speed + 0.1)
+            notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
+        end
+    end)
+    musicBtn = makeBtn("Music: ON", 10, Color3.fromRGB(60, 80, 60), function()
+        bgMusicOn = not bgMusicOn
+        if bgMusicOn then music:Play() notify("Music ON")
+        else music:Stop() notify("Music OFF") end
+        musicBtn.Text = bgMusicOn and "Music: ON" or "Music: OFF"
+    end)
+    favBtn = makeBtn("Favorite", 11, Color3.fromRGB(90, 70, 40), function()
+        local name = ctx.getName()
+        if name and not (name == "Idle" or name == "WalkV2" or name == "RunV2") then
+            local added = toggleFavorite(name)
+            notify(added and ("Favorited " .. name) or ("Unfavorited " .. name))
+        end
+    end)
+
+    toggle.MouseButton1Click:Connect(function()
+        panel.Visible = not panel.Visible
+    end)
+    toggle.TouchTap:Connect(function()
+        panel.Visible = not panel.Visible
+    end)
+    closeBtn.MouseButton1Click:Connect(function()
+        panel.Visible = false
+    end)
+    closeBtn.TouchTap:Connect(function()
+        panel.Visible = false
+    end)
+end
 
 local function setupCharacter(character)
     disconnectAll()
@@ -891,6 +1134,23 @@ local function setupCharacter(character)
         else
             playDance(name)
         end
+    end
+
+    if IS_MOBILE then
+        buildMobileUI(character, {
+            play = playDance,
+            stop = stopDance,
+            sit = playSit,
+            isDancing = isDancing,
+            isSitting = function() return isSitting end,
+            isSprinting = function() return sprinting end,
+            toggleSprint = function()
+                sprinting = not sprinting
+                updateMovementAnim()
+            end,
+            getName = function() return currentAnimName end,
+            currentAnim = function() return currentAnim end,
+        })
     end
 
     table.insert(connections, hum:GetPropertyChangedSignal("MoveDirection"):Connect(function()
@@ -1187,10 +1447,14 @@ if player.Character then setupCharacter(player.Character) end
 
 print("==========================================")
 print("[CurrentVector-Dances V1] Ready")
-print("Dances: Q / E / R")
-print("Page: M | Music: =")
-print("Stop: Backspace | Speed: [ ]")
-print("Favorite: F | Sprint: Hold LeftControl")
+if IS_MOBILE then
+    print("Mobile: Tap the CV button to open the control panel")
+else
+    print("Dances: Q / E / R")
+    print("Page: M | Music: =")
+    print("Stop: Backspace | Speed: [ ]")
+    print("Favorite: F | Sprint: Hold LeftControl")
+end
 print("Wheel: 1-8 keys or click Roblox emotes wheel")
 print("Chat: /dance <name> | /poop | /sit | /unsit | /stop | /cv")
 print("==========================================")
