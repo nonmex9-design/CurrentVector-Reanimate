@@ -21,17 +21,14 @@ print("Ready!")
 
 local baseURL = "https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Animations/"
 local animList = {
-    "Backflip", "Bang2", "BreakDance", "Floss", "Fresh", "Groovv",
+    "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh", "Groovv",
     "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll",
     "Idle", "Walk", "Run", "WalkV2", "RunV2", "Jump", "Fall", "Land", "Poop",
 }
 
 local function isValidRbxm(data)
     if not data or #data < 20 then return false end
-    local head = string.sub(data, 1, 7)
-    if head == "<roblox" then return true end
-    local head2 = string.sub(data, 1, 6)
-    if head2 == "<roblo" then return true end
+    if string.sub(data, 1, 7) == "<roblox" then return true end
     if string.sub(data, 1, 1) == "<" then return true end
     return false
 end
@@ -46,19 +43,13 @@ local function downloadAnim(name)
     end)
     if not ok or not data then
         warn("[CurrentVector-Dances V1] HTTP failed for " .. name .. ": " .. tostring(data))
-        if isfile(path) then
-            warn("[CurrentVector-Dances V1] Keeping existing file for " .. name)
-        end
         return
     end
 
     if not isValidRbxm(data) then
-        warn("[CurrentVector-Dances V1] " .. name .. " is not a valid .rbxm (probably a 404 page). Size: " .. tostring(#data))
+        warn("[CurrentVector-Dances V1] " .. name .. " is not a valid .rbxm. Size: " .. tostring(#data))
         local preview = string.sub(data, 1, 120)
         warn("[CurrentVector-Dances V1] Preview: " .. preview)
-        if isfile(path) then
-            warn("[CurrentVector-Dances V1] Keeping existing file for " .. name)
-        end
         return
     end
 
@@ -323,9 +314,9 @@ local function makeanimlibrary()
 end
 
 local wheelPages = {
-    { "Backflip", "Bang2", "BreakDance", "Floss", "Fresh", "Groovv", "Helicopter", "Kazotsky Kick (Spy)" },
-    { "Parrot", "RickRoll", "Backflip", "Bang2", "BreakDance", "Floss", "Fresh", "Groovv" },
-    { "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Backflip", "Bang2", "BreakDance", "Floss" },
+    { "Bang2", "Bang3", "Banged1", "Backflip", "BreakDance", "Floss", "Fresh", "Groovv" },
+    { "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Bang2", "Bang3", "Banged1", "Backflip" },
+    { "BreakDance", "Floss", "Fresh", "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll" },
 }
 
 local dancePages = {}
@@ -348,7 +339,7 @@ for _, page in ipairs(wheelPages) do
     end
 end
 
-local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true }
+local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true, Bang3 = true, Banged1 = true }
 local platformDances = { Backflip = true, Helicopter = true }
 
 local player = Players.LocalPlayer
