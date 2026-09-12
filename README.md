@@ -4,7 +4,7 @@
 
 *Reanimate:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/Reanimate.luau"))()`
 
-*CVD1:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
+*CVD1:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CVD1.luau"))()`
 
 *KD3:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
 
