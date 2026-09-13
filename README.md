@@ -1,17 +1,5 @@
 # Hello! I made this bc I was bored..
 
-### Loadstrings:
-
-*Reanimate:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/Reanimate.luau"))()`
-
-*CVD1:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CVD1.luau"))()`
-
-*KD3:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
-
-<p align="left">
-  <img src="output-onlinepngtools (4).png" width="850">
-</p>
-
 # How to use CurrentVector Reanimate<:VExclamation:1481190623959711744>
 
 ## <a:Sadge:1401272411147730985> First, have an Executor with atleast 90-UNC / 90-sUNC. (VERY IMPORTANT)
@@ -27,4 +15,14 @@
 
 *CVD1:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CVD1.luau"))()`
 
--# Expierencing any bugs? Make a post in <#1530816195090186250>!
+### Loadstrings:
+
+*Reanimate:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/Reanimate.luau"))()`
+
+*CVD1:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CVD1.luau"))()`
+
+*KD3:* `loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/KD3.luau"))()`
+
+<p align="left">
+  <img src="output-onlinepngtools (4).png" width="850">
+</p>
