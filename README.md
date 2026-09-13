@@ -3,9 +3,8 @@
 # How to use CurrentVector Reanimate <img src="1481190623959711744.webp" width="50">
 
 ## <img src="1401272411147730985.webp" width="35"> First, have an Executor with atleast 90-UNC / 90-sUNC. (VERY IMPORTANT)
-### *! Lower UNC/sUNC executors may not work correctly !*
-
-### I recommend *[Nexomia](https://nexomia.win)* if ur on PC 
+#### *! Lower UNC/sUNC executors may not work correctly !*
+#### I recommend *[Nexomia](https://nexomia.win)* if ur on PC 
 
 ## Second, run Reanimate, then wait 5 seconds. (To make sure ur character is fully reanimated and ready)
 
