@@ -1,6 +1,6 @@
 # Hello! I made this bc I was bored..
 
-# How to use CurrentVector Reanimate <img src="1481190623959711744.webp" width="24">
+# How to use CurrentVector Reanimate <img src="1481190623959711744.webp" width="50">
 
 ## <a:Sadge:1401272411147730985> First, have an Executor with atleast 90-UNC / 90-sUNC. (VERY IMPORTANT)
 ### *! Lower UNC/sUNC executors may not work correctly !*
