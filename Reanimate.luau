@@ -11,7 +11,7 @@ local addtools = false
 local hedafterneck = true
 local loadtime = game:GetService("Players").RespawnTime + 0.5
 local method = 3
-local alignmode = 2
+local alignmode = 1
 
 local lp = game:GetService("Players").LocalPlayer
 local rs = game:GetService("RunService")
@@ -25,13 +25,19 @@ local v3 = Vector3.new
 local v3_0 = Vector3.zero
 local inf = math.huge
 local c = lp.Character
+
+pcall(function()
+    settings().Physics.AllowSleep = false
+    settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
+end)
+
 local fnl = loadstring(game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/Notifications.luau"))()
 
 function notify(title, text, duration)
   title = title or "Notification"
   text = text or "No text provided."
   duration = duration or 5
-  
+
   fnl:MakeNotification({
     Title = title,
     Text = text,
@@ -61,6 +67,8 @@ end
 
 local function align(Part0, Part1)
 	Part0.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+	Part0.Massless = true
+	Part0.CanCollide = false
 
 	local att0 = Instance.new("Attachment", Part0)
 	att0.Orientation = v3_0
@@ -293,11 +301,20 @@ for i, v in pairs(cl:GetDescendants()) do
 	if v:IsA("BasePart") then
 		v.Transparency = 1
 		v.Anchored = false
+		v.Massless = true
+		v.CanCollide = false
 	end
 end
 
 local model = Instance.new("Model", c)
 model.Name = model.ClassName
+
+pcall(function()
+	model:SetNetworkOwner(lp)
+end)
+pcall(function()
+	c:SetNetworkOwner(lp)
+end)
 
 model.Destroying:Connect(function()
 	model = nil
@@ -389,6 +406,17 @@ for i, scr in pairs(model:GetDescendants()) do
 				end
 			end
 		end
+	end
+end
+
+for _, part in ipairs(model:GetDescendants()) do
+	if part:IsA("BasePart") then
+		pcall(function() part:SetNetworkOwner(lp) end)
+	end
+end
+for _, part in ipairs(c:GetDescendants()) do
+	if part:IsA("BasePart") then
+		pcall(function() part:SetNetworkOwner(lp) end)
 	end
 end
 
