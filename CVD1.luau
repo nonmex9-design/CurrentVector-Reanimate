@@ -10,10 +10,13 @@ local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RESET_GUI_NAME = "refreshtestyescurrent"
 local FORCE_REFRESH = true
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local DISCORD_URL = "https://discord.gg/SK5XnQRchG"
+local AUTO_UPDATE_INTERVAL = 300
 
 local shared = (getgenv and getgenv()) or _G
 
@@ -28,6 +31,12 @@ if existingResetGui then existingResetGui:Destroy() end
 local existingBlur = Lighting:FindFirstChild("CVWheelBlur")
 if existingBlur then existingBlur:Destroy() end
 
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local existingNotifs = playerGui:FindFirstChild("Notifications")
+if existingNotifs then existingNotifs:Destroy() end
+
 pcall(function()
     if isfolder and not isfolder("CurrentVector") then makefolder("CurrentVector") end
     if isfolder and not isfolder("CurrentVector/Animations") then makefolder("CurrentVector/Animations") end
@@ -35,19 +44,346 @@ pcall(function()
 end)
 print("Ready!")
 
+local function sayMessage(msg)
+    pcall(function()
+        local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if chatEvents then
+            local sayRequest = chatEvents:FindFirstChild("SayMessageRequest")
+            if sayRequest then
+                sayRequest:FireServer(msg, "All")
+                return
+            end
+        end
+    end)
+    pcall(function()
+        local textChatService = game:GetService("TextChatService")
+        if textChatService and textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local channels = textChatService:FindFirstChild("TextChannels")
+            if channels then
+                local general = channels:FindFirstChild("RBXGeneral")
+                if general then
+                    general:SendAsync(msg)
+                end
+            end
+        end
+    end)
+end
+
+task.spawn(function()
+    task.wait(0.3)
+    sayMessage("CurrentVectorDances-V1 Loaded!")
+    task.wait(1)
+    sayMessage("Enjoy! <3")
+end)
+
+local MUSIC_BASE = "https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CurrentVector/Music/"
+local MUSIC_BASE_ALT = "https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/main/CurrentVector/Music/"
+
+local function customasset(id)
+    if not isfile or not writefile or not getcustomasset then
+        warn("[CV] Missing file functions, cannot load: " .. id)
+        return nil
+    end
+    local path = "CurrentVector/Music/" .. id
+    if not isfile(path) then
+        local urls = {
+            MUSIC_BASE .. id,
+            MUSIC_BASE_ALT .. id,
+        }
+        for _, url in ipairs(urls) do
+            local ok, data = pcall(function() return game:HttpGet(url) end)
+            if ok and data and #data > 500 then
+                local head = string.sub(data, 1, 20)
+                local isHtml = string.find(head, "<!DOCTYPE", 1, true) or string.find(head, "<html", 1, true)
+                if not isHtml then
+                    pcall(function() writefile(path, data) end)
+                    print("[CV] Downloaded sound: " .. id .. " (" .. tostring(#data) .. " bytes)")
+                    break
+                end
+            end
+        end
+    end
+    if not isfile(path) then
+        warn("[CV] Sound file not found: " .. path)
+        return nil
+    end
+    local ok, asset = pcall(getcustomasset, path)
+    if ok and asset then
+        return asset
+    end
+    warn("[CV] getcustomasset failed for: " .. path)
+    return nil
+end
+
+local CLICK_FALLBACK = "rbxasset://sounds/electronicpingshort.wav"
+
+local soundAssets = {}
+soundAssets.click = CLICK_FALLBACK
+soundAssets.open = CLICK_FALLBACK
+soundAssets.hover = CLICK_FALLBACK
+soundAssets.play = CLICK_FALLBACK
+soundAssets.stop = CLICK_FALLBACK
+
+task.spawn(function()
+    local clickId = customasset("button_click.mp3")
+    if clickId then
+        soundAssets.click = clickId
+        soundAssets.open = clickId
+        soundAssets.hover = clickId
+        soundAssets.play = clickId
+        soundAssets.stop = clickId
+        print("[CV] Click sound loaded successfully")
+    else
+        print("[CV] Click sound failed, using built-in fallback")
+    end
+end)
+
+local notifEvent = nil
+
+local function createNotificationSystem()
+    local screen = Instance.new("ScreenGui")
+    screen.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+    screen.IgnoreGuiInset = true
+    screen.ScreenInsets = Enum.ScreenInsets.None
+    screen.Name = "Notifications"
+    screen.ResetOnSpawn = false
+    screen.Parent = playerGui
+
+    local frame = Instance.new("Frame")
+    frame.ZIndex = 999999999
+    frame.BorderSizePixel = 0
+    frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 1
+    frame.Parent = screen
+
+    local container = Instance.new("Frame")
+    container.ZIndex = 999999999
+    container.BorderSizePixel = 0
+    container.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    container.Name = "Notifications"
+    container.BackgroundTransparency = 1
+    container.Parent = frame
+
+    local template = Instance.new("Frame")
+    template.Visible = false
+    template.BorderSizePixel = 0
+    template.BackgroundColor3 = Color3.fromRGB(16, 16, 16)
+    template.Size = UDim2.new(0.17572, 0, 0.08173, 0)
+    template.Position = UDim2.new(0.81113, 0, 0.89423, 0)
+    template.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    template.Name = "Notification"
+    template.BackgroundTransparency = 0.3
+    template.Parent = container
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = template
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Transparency = 0.3
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(26, 26, 26)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = template
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Rotation = 90
+    gradient.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.5, 0),
+        NumberSequenceKeypoint.new(1, 0.5)
+    }
+    gradient.Parent = stroke
+
+    local title = Instance.new("TextLabel")
+    title.TextWrapped = true
+    title.ZIndex = 2
+    title.BorderSizePixel = 0
+    title.TextSize = 14
+    title.TextScaled = true
+    title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    title.FontFace = Font.new("rbxasset://fonts/families/Ubuntu.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    title.TextColor3 = Color3.fromRGB(201, 201, 201)
+    title.BackgroundTransparency = 1
+    title.RichText = true
+    title.Size = UDim2.new(0.87978, 0, -0.08922, 27)
+    title.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    title.Text = ""
+    title.Name = "Title"
+    title.Position = UDim2.new(0.06011, 0, 0.16364, 0)
+    title.Parent = template
+
+    local description = Instance.new("TextLabel")
+    description.TextWrapped = true
+    description.ZIndex = 2
+    description.BorderSizePixel = 0
+    description.TextSize = 14
+    description.TextScaled = true
+    description.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    description.FontFace = Font.new("rbxasset://fonts/families/Ubuntu.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    description.TextColor3 = Color3.fromRGB(151, 151, 151)
+    description.BackgroundTransparency = 1
+    description.RichText = true
+    description.Size = UDim2.new(0.87978, 0, -0.23805, 27)
+    description.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    description.Text = ""
+    description.Name = "Description"
+    description.Position = UDim2.new(0.06011, 0, 0.56533, 0)
+    description.Parent = template
+
+    local durationFrame = Instance.new("Frame")
+    durationFrame.BorderSizePixel = 0
+    durationFrame.BackgroundColor3 = Color3.fromRGB(61, 61, 61)
+    durationFrame.Size = UDim2.new(0, 0, 1, 0)
+    durationFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    durationFrame.Name = "DurationFrame"
+    durationFrame.BackgroundTransparency = 0.8
+    durationFrame.Parent = template
+
+    local dfCorner = Instance.new("UICorner")
+    dfCorner.CornerRadius = UDim.new(0, 10)
+    dfCorner.Parent = durationFrame
+
+    local event = Instance.new("BindableEvent")
+    event.Name = "SGDDG43"
+    event.Parent = frame
+
+    local TweenIn = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local TweenOut = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+
+    container.AnchorPoint = Vector2.new(1, 1)
+    container.Position = UDim2.new(1, -20, 1, -20)
+
+    local Active = {}
+
+    local function Tween(Object, Properties, Info)
+        local t = TweenService:Create(Object, Info, Properties)
+        t:Play()
+        return t
+    end
+
+    local function UpdatePositions()
+        for i, N in ipairs(Active) do
+            Tween(N, {
+                Position = UDim2.new(1, 0, 1, -(i - 1) * (N.AbsoluteSize.Y + 10))
+            }, TweenIn)
+        end
+    end
+
+    local function CreateNotification(Data)
+        local Notif = template:Clone()
+        Notif.Parent = container
+        Notif.Visible = true
+        Notif.Title.Text = Data.Title or "Notification"
+        Notif.Description.Text = Data.Description or ""
+        Notif.AnchorPoint = Vector2.new(1, 1)
+        Notif.Position = UDim2.new(1, 300, 1, 0)
+        Notif.Title.TextTransparency = 1
+        Notif.Description.TextTransparency = 1
+        Notif.DurationFrame.Size = UDim2.new(1, 0, 1, 0)
+        table.insert(Active, Notif)
+        UpdatePositions()
+        Tween(Notif.Title, { TextTransparency = 0 }, TweenIn)
+        Tween(Notif.Description, { TextTransparency = 0 }, TweenIn)
+        Tween(Notif, {
+            Position = UDim2.new(1, 0, 1, -(#Active - 1) * (Notif.AbsoluteSize.Y + 10))
+        }, TweenIn)
+        Tween(Notif.DurationFrame, {
+            Size = UDim2.new(0, 0, 1, 0)
+        }, TweenInfo.new(Data.Duration or 3, Enum.EasingStyle.Linear))
+        task.wait(Data.Duration or 3)
+        Tween(Notif, { Position = UDim2.new(1, 300, 1, 0) }, TweenOut)
+        Tween(Notif.Title, { TextTransparency = 1 }, TweenOut)
+        Tween(Notif.Description, { TextTransparency = 1 }, TweenOut)
+        task.wait(0.4)
+        local idx = table.find(Active, Notif)
+        if idx then table.remove(Active, idx) end
+        Notif:Destroy()
+        UpdatePositions()
+    end
+
+    event.Event:Connect(function(Data)
+        task.spawn(function()
+            CreateNotification(Data)
+        end)
+    end)
+
+    return event
+end
+
+notifEvent = createNotificationSystem()
+
+local function notify(title, text, dur)
+    if notifEvent then
+        notifEvent:Fire({
+            Title = title or "CurrentVector",
+            Description = text or "",
+            Duration = dur or 3,
+        })
+    end
+end
+
+local function notifyOnly(text, dur)
+    notify("CurrentVector", text, dur or 3)
+end
+
+local function playSound(name, volume)
+    local id = soundAssets[name]
+    if not id then
+        id = soundAssets.click or CLICK_FALLBACK
+    end
+    if not id then return end
+    local s = Instance.new("Sound")
+    s.SoundId = id
+    s.Volume = volume or 0.35
+    s.Parent = SoundService
+    s:Play()
+    task.delay(2, function()
+        pcall(function() s:Destroy() end)
+    end)
+end
+
+local function safeSetClipboard(text)
+    pcall(function()
+        if setclipboard then
+            setclipboard(text)
+        end
+    end)
+end
+
 local primaryBase = "https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CurrentVector/Animations/"
 local fallbackBase = "https://github.com/nonmex9-design/CurrentVector-Reanimate/raw/refs/heads/main/CurrentVector/Animations/"
+local repoAPI = "https://api.github.com/repos/nonmex9-design/CurrentVector-Reanimate/contents/CurrentVector/Animations"
 local animList = {
     "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh", "Groovv",
     "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Twerk",
+    "GarryDance2", "DefaultDance", "SpinBoi",
+    "LAUGHLOLHAHAHAAHAH", "LAUGHLOLHAHAHAAHAH2",
     "Idle", "Walk", "Run", "WalkV2", "RunV2", "Jump", "Fall", "Land", "Poop",
     "Sit2", "Sitting", "PP", "Wave3",
 }
 
+local displayNames = {
+    ["LAUGHLOLHAHAHAAHAH"] = "Laugh",
+    ["LAUGHLOLHAHAHAAHAH2"] = "Laugh 2",
+}
+
+local function getDisplayName(name)
+    return displayNames[name] or name
+end
+
 local function isValidRbxm(data)
     if not data or #data < 20 then return false end
-    if string.sub(data, 1, 1) == "<" then return true end
-    return false
+    local head = string.sub(data, 1, 20)
+    if string.find(head, "<!DOCTYPE", 1, true) then return false end
+    if string.find(head, "<html", 1, true) then return false end
+    if string.find(head, "404", 1, true) and #data < 1000 then return false end
+    if string.find(head, "Not Found", 1, true) and #data < 1000 then return false end
+    return true
 end
 
 local function tryHttpGet(url)
@@ -56,24 +392,118 @@ local function tryHttpGet(url)
     return nil
 end
 
-local function downloadAnim(name)
+local function downloadAnim(name, silent)
     local path = "CurrentVector/Animations/" .. name .. ".rbxm"
     local encoded = name:gsub(" ", "%%20")
-    local data = tryHttpGet(primaryBase .. encoded .. ".rbxm")
-    if not data or not isValidRbxm(data) then
-        data = tryHttpGet(fallbackBase .. encoded .. ".rbxm")
+    local cacheBuster = "?cb=" .. tostring(math.floor(tick()))
+
+    local candidates = {
+        primaryBase .. encoded .. ".rbxm" .. cacheBuster,
+        fallbackBase .. encoded .. ".rbxm" .. cacheBuster,
+        primaryBase .. encoded:lower() .. ".rbxm" .. cacheBuster,
+        fallbackBase .. encoded:lower() .. ".rbxm" .. cacheBuster,
+        primaryBase .. encoded .. ".rbxmx" .. cacheBuster,
+        fallbackBase .. encoded .. ".rbxmx" .. cacheBuster,
+    }
+
+    local data = nil
+    local lastUrl = nil
+    for _, url in ipairs(candidates) do
+        lastUrl = url
+        local got = tryHttpGet(url)
+        if got and isValidRbxm(got) then
+            data = got
+            break
+        end
+        if got and not isValidRbxm(got) then
+            local preview = string.sub(got, 1, 80)
+            print("[CV] " .. name .. " -> " .. url .. " returned: " .. preview)
+        end
     end
-    if not data or not isValidRbxm(data) then
-        warn("[CurrentVector-Dances V1] " .. name .. " failed")
-        return
+
+    if not data then
+        warn("[CV] " .. name .. " failed all URLs. Last tried: " .. tostring(lastUrl))
+        if not silent then
+            notify("Download Failed", name .. " — check GitHub", 5)
+        end
+        return false
     end
-    pcall(function() writefile(path, data) end)
+
+    local wrote = pcall(function() writefile(path, data) end)
+    if wrote and not silent then
+        notify("Downloaded", name .. " (" .. tostring(#data) .. " bytes)", 3)
+    end
+    return wrote
 end
 
-for _, name in ipairs(animList) do
-    local path = "CurrentVector/Animations/" .. name .. ".rbxm"
-    if FORCE_REFRESH or not isfile(path) then downloadAnim(name) end
+local function runInitialDownloads()
+    local toDownload = {}
+    for _, name in ipairs(animList) do
+        local path = "CurrentVector/Animations/" .. name .. ".rbxm"
+        if FORCE_REFRESH or not isfile(path) then
+            table.insert(toDownload, name)
+        end
+    end
+    if #toDownload == 0 then
+        print("[CurrentVector-Dances V1] All animations cached")
+        return
+    end
+    notify("Downloading Animations", "Fetching " .. tostring(#toDownload) .. " files...", 4)
+    local count = 0
+    for _, name in ipairs(toDownload) do
+        if downloadAnim(name, false) then
+            count = count + 1
+        end
+    end
+    notify("Downloads Complete", tostring(count) .. " of " .. tostring(#toDownload) .. " succeeded.", 4)
 end
+
+task.spawn(runInitialDownloads)
+
+local lastKnownAnimations = {}
+for _, name in ipairs(animList) do
+    lastKnownAnimations[name] = true
+end
+
+local function autoUpdateLoop()
+    while true do
+        task.wait(AUTO_UPDATE_INTERVAL)
+        pcall(function()
+            local response = tryHttpGet(repoAPI)
+            if not response then return end
+            local data = HttpService:JSONDecode(response)
+            if type(data) ~= "table" then return end
+            local newFiles = {}
+            for _, file in ipairs(data) do
+                if type(file) == "table" and file.name and string.sub(file.name, -5) == ".rbxm" then
+                    local animName = string.sub(file.name, 1, -6)
+                    if not lastKnownAnimations[animName] then
+                        local url = primaryBase .. file.name:gsub(" ", "%%20")
+                        local content = tryHttpGet(url)
+                        if content and isValidRbxm(content) then
+                            local path = "CurrentVector/Animations/" .. animName .. ".rbxm"
+                            pcall(function() writefile(path, content) end)
+                            lastKnownAnimations[animName] = true
+                            table.insert(animList, animName)
+                            if not table.find(allDances, animName) then
+                                table.insert(allDances, animName)
+                            end
+                            table.insert(newFiles, animName)
+                        end
+                    end
+                end
+            end
+            if #newFiles > 0 then
+                notify("Auto-Update", "New emotes added: " .. table.concat(newFiles, ", "), 5)
+                if wheelNavRef.refresh then
+                    wheelNavRef.refresh()
+                end
+            end
+        end)
+    end
+end
+
+task.spawn(autoUpdateLoop)
 
 local favPath = "CurrentVector/favorites.json"
 local favorites = {}
@@ -106,28 +536,31 @@ local function toggleFavorite(name)
     return true
 end
 
-local function notify(text, dur)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "CurrentVector-Dances V1",
-            Text = text,
-            Duration = dur or 3,
-        })
-    end)
+local recentPath = "CurrentVector/recent.json"
+local recents = {}
+if isfile(recentPath) then
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(recentPath)) end)
+    if ok and type(data) == "table" then recents = data end
 end
 
-local function customasset(id)
-    if not isfile or not getcustomasset then return "rbxassetid://1837879082" end
-    local path = "CurrentVector/Music/" .. id
-    if not isfile(path) then
-        local ok = pcall(function()
-            writefile(path, game:HttpGet("https://raw.githubusercontent.com/nonmex9-design/CurrentVector-Reanimate/refs/heads/main/CurrentVector/Music/" .. id))
-        end)
-        if not ok then return "rbxassetid://1837879082" end
+local function saveRecents()
+    pcall(function() writefile(recentPath, HttpService:JSONEncode(recents)) end)
+end
+
+local function pushRecent(name)
+    if not name or name == "Idle" or name == "WalkV2" or name == "RunV2"
+        or name == "Jump" or name == "Fall" or name == "Land" then return end
+    for i, v in ipairs(recents) do
+        if v == name then
+            table.remove(recents, i)
+            break
+        end
     end
-    local ok, asset = pcall(getcustomasset, path)
-    if ok and asset then return asset end
-    return "rbxassetid://1837879082"
+    table.insert(recents, 1, name)
+    while #recents > 10 do
+        table.remove(recents, #recents)
+    end
+    saveRecents()
 end
 
 local LAST_POSE = {}
@@ -324,6 +757,8 @@ end
 local allDances = {
     "Backflip", "Bang2", "Bang3", "Banged1", "BreakDance", "Floss", "Fresh",
     "Groovv", "Helicopter", "Kazotsky Kick (Spy)", "Parrot", "RickRoll", "Twerk",
+    "GarryDance2", "DefaultDance", "SpinBoi",
+    "LAUGHLOLHAHAHAAHAH", "LAUGHLOLHAHAHAAHAH2",
 }
 
 local PER_PAGE = 8
@@ -342,24 +777,39 @@ end
 
 local searchQuery = ""
 local inFavoritesView = false
+local inRecentsView = false
 
-local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true, Bang3 = true, Banged1 = true }
+local particleDances = { Groovv = true, RickRoll = true, Backflip = true, Bang2 = true, Bang3 = true, Banged1 = true, SpinBoi = true }
 
-local player = Players.LocalPlayer
 local currentPage = 1
 local wheelPlayRef = { fn = nil }
 local wheelNavRef = { pageLabel = nil, total = #wheelPages, refresh = nil }
 local searchBoxRef = { box = nil }
 local favBtnRef = { btn = nil }
+local recentsBtnRef = { btn = nil }
 
 local music = Instance.new("Sound")
 music.Name = "CurrentVectorMusic"
-music.SoundId = customasset("background.mp3")
 music.Looped = true
 music.Volume = 0.4
 music.Parent = SoundService
 
 local bgMusicOn = true
+local musicLoaded = false
+
+task.spawn(function()
+    local bgId = customasset("background.mp3")
+    if bgId then
+        music.SoundId = bgId
+        musicLoaded = true
+        print("[CV] Background music loaded successfully")
+        if bgMusicOn then
+            pcall(function() music:Play() end)
+        end
+    else
+        warn("[CV] Background music failed to load")
+    end
+end)
 
 local connections = {}
 local characterConn = nil
@@ -502,6 +952,8 @@ local function fullCleanup()
         mobilePanel = nil
         mobileGrid = nil
     end
+    local notifGui = playerGui:FindFirstChild("Notifications")
+    if notifGui then notifGui:Destroy() end
 end
 
 shared.CurrentVectorCleanup = fullCleanup
@@ -621,7 +1073,7 @@ local function refreshWheelSlot(index, danceName, character)
     if not slot then return end
     if slot.danceName == danceName then return end
     slot.danceName = danceName
-    slot.text.Text = danceName or ""
+    slot.text.Text = danceName and getDisplayName(danceName) or ""
     if danceName then
         buildPreviewForSlot(slot, danceName, character)
     end
@@ -632,7 +1084,8 @@ local function getDisplayedEmotes()
         local q = string.lower(searchQuery)
         local filtered = {}
         for _, name in ipairs(allDances) do
-            if string.find(string.lower(name), q, 1, true) then
+            local display = getDisplayName(name)
+            if string.find(string.lower(name), q, 1, true) or string.find(string.lower(display), q, 1, true) then
                 table.insert(filtered, name)
             end
         end
@@ -640,6 +1093,9 @@ local function getDisplayedEmotes()
     end
     if inFavoritesView then
         return favorites, "Favorites (" .. tostring(#favorites) .. ")"
+    end
+    if inRecentsView then
+        return recents, "Recents (" .. tostring(#recents) .. ")"
     end
     local page = wheelPages[currentPage] or {}
     return page, "Page " .. currentPage .. " / " .. #wheelPages
@@ -664,6 +1120,13 @@ local function refreshWheelPage()
             favBtnRef.btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
     end
+    if recentsBtnRef.btn then
+        if inRecentsView then
+            recentsBtnRef.btn.TextColor3 = Color3.fromRGB(120, 200, 255)
+        else
+            recentsBtnRef.btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
+    end
 end
 
 local function hookRobloxEmoteWheel()
@@ -672,13 +1135,31 @@ local function hookRobloxEmoteWheel()
     if not ok1 or not RobloxGui then return end
     local ok2, EmotesMenu = pcall(function() return RobloxGui:WaitForChild("EmotesMenu", 15) end)
     if not ok2 or not EmotesMenu then return end
-    local wheel, emotesButtons, slotNumbers
+    local wheel, emotesButtons, slotNumbers, middleText
     local ok3 = pcall(function()
         wheel = EmotesMenu.Children.Main.EmotesWheel
         emotesButtons = wheel.Front.EmotesButtons
         slotNumbers = wheel.Front.SlotNumbers
+        middleText = wheel.Back.Background.BackgroundText.MiddleText
     end)
     if not ok3 or not emotesButtons or not slotNumbers then return end
+
+    local defaultText = "Select an Emote"
+    local cvHover = nil
+    if middleText and middleText:IsA("TextLabel") then
+        defaultText = middleText.Text
+
+        middleText.TextTransparency = 1
+
+        local oldClone = middleText.Parent:FindFirstChild("CVHover")
+        if oldClone then oldClone:Destroy() end
+
+        cvHover = middleText:Clone()
+        cvHover.Name = "CVHover"
+        cvHover.TextTransparency = 0
+        cvHover.Text = defaultText
+        cvHover.Parent = middleText.Parent
+    end
 
     local slotPositions = {
         UDim2.new(0.5, 0, 0.1125, 0),
@@ -756,10 +1237,22 @@ local function hookRobloxEmoteWheel()
 
         local slot = { img = img, viewport = viewport, text = text, button = btn, danceName = nil }
         btn.MouseButton1Click:Connect(function()
+            playSound("click")
             if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
         end)
         btn.TouchTap:Connect(function()
+            playSound("click")
             if wheelPlayRef.fn and slot.danceName then wheelPlayRef.fn(slot.danceName) end
+        end)
+        btn.MouseEnter:Connect(function()
+            if cvHover and slot.danceName then
+                cvHover.Text = getDisplayName(slot.danceName)
+            end
+        end)
+        btn.MouseLeave:Connect(function()
+            if cvHover then
+                cvHover.Text = defaultText
+            end
         end)
         wheelSlots[i] = slot
 
@@ -783,7 +1276,7 @@ local function hookRobloxEmoteWheel()
 
     local searchFrame = Instance.new("Frame")
     searchFrame.Name = "CVSearchFrame"
-    searchFrame.Size = UDim2.new(0.7, -5, 1, 0)
+    searchFrame.Size = UDim2.new(0.54, -5, 1, 0)
     searchFrame.Position = UDim2.new(0, 0, 0, 0)
     searchFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
     searchFrame.BackgroundTransparency = 0.15
@@ -816,7 +1309,7 @@ local function hookRobloxEmoteWheel()
     searchBox.Position = UDim2.new(0, 40, 0, 0)
     searchBox.BackgroundTransparency = 1
     searchBox.Text = ""
-    searchBox.PlaceholderText = "Search emotes..."
+    searchBox.PlaceholderText = "Search..."
     searchBox.PlaceholderColor3 = Color3.fromRGB(130, 130, 155)
     searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     searchBox.Font = Enum.Font.Gotham
@@ -837,8 +1330,8 @@ local function hookRobloxEmoteWheel()
 
     local favBtn = Instance.new("TextButton")
     favBtn.Name = "CVFavBtn"
-    favBtn.Size = UDim2.new(0.28, -5, 1, 0)
-    favBtn.Position = UDim2.new(0.72, 0, 0, 0)
+    favBtn.Size = UDim2.new(0.21, -5, 1, 0)
+    favBtn.Position = UDim2.new(0.55, 0, 0, 0)
     favBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     favBtn.BackgroundTransparency = 0.15
     favBtn.BorderSizePixel = 0
@@ -859,13 +1352,48 @@ local function hookRobloxEmoteWheel()
 
     favBtnRef.btn = favBtn
 
+    local recentsBtn = Instance.new("TextButton")
+    recentsBtn.Name = "CVRecentsBtn"
+    recentsBtn.Size = UDim2.new(0.21, -5, 1, 0)
+    recentsBtn.Position = UDim2.new(0.77, 0, 0, 0)
+    recentsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    recentsBtn.BackgroundTransparency = 0.15
+    recentsBtn.BorderSizePixel = 0
+    recentsBtn.Text = "⟲"
+    recentsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    recentsBtn.TextStrokeTransparency = 0.4
+    recentsBtn.Font = Enum.Font.GothamBold
+    recentsBtn.TextScaled = true
+    recentsBtn.ZIndex = 30
+    recentsBtn.Parent = topBar
+    local rbCorner = Instance.new("UICorner")
+    rbCorner.CornerRadius = UDim.new(0, 10)
+    rbCorner.Parent = recentsBtn
+    local rbStroke = Instance.new("UIStroke")
+    rbStroke.Color = Color3.fromRGB(90, 90, 130)
+    rbStroke.Thickness = 2
+    rbStroke.Parent = recentsBtn
+
+    recentsBtnRef.btn = recentsBtn
+
     local function toggleFavView()
+        playSound("click")
         inFavoritesView = not inFavoritesView
+        if inFavoritesView then inRecentsView = false end
+        if wheelNavRef.refresh then wheelNavRef.refresh() end
+    end
+
+    local function toggleRecentsView()
+        playSound("click")
+        inRecentsView = not inRecentsView
+        if inRecentsView then inFavoritesView = false end
         if wheelNavRef.refresh then wheelNavRef.refresh() end
     end
 
     favBtn.MouseButton1Click:Connect(toggleFavView)
     favBtn.TouchTap:Connect(toggleFavView)
+    recentsBtn.MouseButton1Click:Connect(toggleRecentsView)
+    recentsBtn.TouchTap:Connect(toggleRecentsView)
 
     local navFrame = Instance.new("Frame")
     navFrame.Name = "CVNav"
@@ -932,14 +1460,16 @@ local function hookRobloxEmoteWheel()
     wheelNavRef.refresh = refreshWheelPage
 
     local function goBack()
-        if searchQuery ~= "" or inFavoritesView then return end
+        if searchQuery ~= "" or inFavoritesView or inRecentsView then return end
+        playSound("click")
         currentPage = currentPage - 1
         if currentPage < 1 then currentPage = #wheelPages end
         refreshWheelPage()
     end
 
     local function goForward()
-        if searchQuery ~= "" or inFavoritesView then return end
+        if searchQuery ~= "" or inFavoritesView or inRecentsView then return end
+        playSound("click")
         currentPage = currentPage + 1
         if currentPage > #wheelPages then currentPage = 1 end
         refreshWheelPage()
@@ -956,18 +1486,30 @@ local function hookRobloxEmoteWheel()
 
     wheel:GetPropertyChangedSignal("Visible"):Connect(function()
         if wheel.Visible then
+            playSound("open")
             setBlurActive(true)
+            if middleText then
+                middleText.TextTransparency = 1
+            end
+            if cvHover then
+                cvHover.Text = defaultText
+                cvHover.TextTransparency = 0
+            end
         else
             setBlurActive(false)
+            if cvHover then
+                cvHover.Text = defaultText
+            end
             if searchBoxRef.box then searchBoxRef.box.Text = "" end
             searchQuery = ""
             inFavoritesView = false
+            inRecentsView = false
             refreshWheelPage()
         end
     end)
 
     if wheel.Visible then
-        setBlurActive(true)
+        setWheelEffects(true)
     end
 
     wheelHooked = true
@@ -977,7 +1519,6 @@ end
 pcall(hookRobloxEmoteWheel)
 
 local function buildMobileUI(character, ctx)
-    local playerGui = player:WaitForChild("PlayerGui")
     if mobileGui then pcall(function() mobileGui:Destroy() end) end
 
     mobileGui = Instance.new("ScreenGui")
@@ -1013,8 +1554,8 @@ local function buildMobileUI(character, ctx)
 
     local panel = Instance.new("Frame")
     panel.Name = "CVPanel"
-    panel.Size = UDim2.new(0, 340, 0, 520)
-    panel.Position = UDim2.new(0.5, -170, 0.5, -260)
+    panel.Size = UDim2.new(0, 340, 0, 600)
+    panel.Position = UDim2.new(0.5, -170, 0.5, -300)
     panel.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
     panel.BackgroundTransparency = 0.05
     panel.BorderSizePixel = 0
@@ -1108,7 +1649,7 @@ local function buildMobileUI(character, ctx)
 
     local scroll = Instance.new("ScrollingFrame")
     scroll.Name = "EmoteScroll"
-    scroll.Size = UDim2.new(1, -24, 0, 240)
+    scroll.Size = UDim2.new(1, -24, 0, 280)
     scroll.Position = UDim2.new(0, 12, 0, 100)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
@@ -1128,15 +1669,15 @@ local function buildMobileUI(character, ctx)
 
     local controlsFrame = Instance.new("Frame")
     controlsFrame.Name = "Controls"
-    controlsFrame.Size = UDim2.new(1, -24, 0, 155)
-    controlsFrame.Position = UDim2.new(0, 12, 1, -167)
+    controlsFrame.Size = UDim2.new(1, -24, 0, 220)
+    controlsFrame.Position = UDim2.new(0, 12, 1, -232)
     controlsFrame.BackgroundTransparency = 1
     controlsFrame.ZIndex = 101
     controlsFrame.Parent = panel
 
     local ctrlLayout = Instance.new("UIGridLayout")
-    ctrlLayout.CellSize = UDim2.new(0.333, -6, 0, 36)
-    ctrlLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+    ctrlLayout.CellSize = UDim2.new(0.25, -5, 0, 36)
+    ctrlLayout.CellPadding = UDim2.new(0, 5, 0, 6)
     ctrlLayout.SortOrder = Enum.SortOrder.LayoutOrder
     ctrlLayout.Parent = controlsFrame
 
@@ -1157,8 +1698,8 @@ local function buildMobileUI(character, ctx)
         local cor = Instance.new("UICorner")
         cor.CornerRadius = UDim.new(0, 8)
         cor.Parent = b
-        b.MouseButton1Click:Connect(onClick)
-        b.TouchTap:Connect(onClick)
+        b.MouseButton1Click:Connect(function() playSound("click"); onClick() end)
+        b.TouchTap:Connect(function() playSound("click"); onClick() end)
         return b
     end
 
@@ -1166,11 +1707,9 @@ local function buildMobileUI(character, ctx)
         if ctx.isSitting() then
             ctx.unsit()
             sitBtn.Text = "Sit"
-            notify("Stood up")
         else
             ctx.sit()
             sitBtn.Text = "Unsit"
-            notify("Sitting")
         end
     end)
     local sprintBtn = makeCtrl("Sprint", 2, Color3.fromRGB(90, 60, 60), function()
@@ -1180,7 +1719,6 @@ local function buildMobileUI(character, ctx)
     makeCtrl("Stop", 3, Color3.fromRGB(120, 40, 50), function()
         ctx.stop()
         sitBtn.Text = "Sit"
-        notify("Stopped")
     end)
     makeCtrl("PP", 4, Color3.fromRGB(90, 40, 90), function()
         ctx.pp()
@@ -1191,42 +1729,63 @@ local function buildMobileUI(character, ctx)
     makeCtrl("Twerk", 6, Color3.fromRGB(120, 60, 100), function()
         ctx.twerk()
     end)
-    makeCtrl("Speed -", 7, Color3.fromRGB(70, 60, 90), function()
+    makeCtrl("Laugh", 7, Color3.fromRGB(90, 90, 40), function()
+        ctx.laugh()
+    end)
+    makeCtrl("Laugh2", 8, Color3.fromRGB(90, 70, 40), function()
+        ctx.laugh2()
+    end)
+    makeCtrl("Spd -", 9, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.max(0.1, ctx.currentAnim().Speed - 0.1)
-            notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
+            notifyOnly("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed), 2)
         end
     end)
-    makeCtrl("Speed +", 8, Color3.fromRGB(70, 60, 90), function()
+    makeCtrl("Spd +", 10, Color3.fromRGB(70, 60, 90), function()
         if ctx.currentAnim() then
             ctx.currentAnim().Speed = math.min(5, ctx.currentAnim().Speed + 0.1)
-            notify("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed))
+            notifyOnly("Speed: " .. string.format("%.1f", ctx.currentAnim().Speed), 2)
         end
     end)
-    local musicBtn = makeCtrl("Music ON", 9, Color3.fromRGB(60, 80, 60), function()
+    local musicBtn = makeCtrl("Music ON", 11, Color3.fromRGB(60, 80, 60), function()
         bgMusicOn = not bgMusicOn
-        if bgMusicOn then music:Play() notify("Music ON")
-        else music:Stop() notify("Music OFF") end
+        if bgMusicOn then
+            if musicLoaded then music:Play() end
+            notify("Music", "Enabled", 2)
+        else
+            music:Stop()
+            notify("Music", "Disabled", 2)
+        end
         musicBtn.Text = bgMusicOn and "Music ON" or "Music OFF"
     end)
-    makeCtrl("Favorite", 10, Color3.fromRGB(90, 70, 40), function()
+    makeCtrl("Fav", 12, Color3.fromRGB(90, 70, 40), function()
         local name = ctx.getName()
         if name and not (name == "Idle" or name == "WalkV2" or name == "RunV2") then
             local added = toggleFavorite(name)
-            notify(added and ("Favorited " .. name) or ("Unfavorited " .. name))
-            if searchQuery == "" and not inFavoritesView then
-                rebuildMobileGrid("")
-            end
+            notify(added and "Favorited" or "Unfavorited", getDisplayName(name), 2)
+            rebuildMobileGrid(mobileSearchBox.Text)
         end
     end)
-    makeCtrl("Random", 11, Color3.fromRGB(80, 60, 120), function()
+    makeCtrl("Random", 13, Color3.fromRGB(80, 60, 120), function()
         if #allDances > 0 then
             local pick = allDances[math.random(1, #allDances)]
             if ctx.isDancing and ctx.getName() == pick then ctx.stop() else ctx.play(pick) end
         end
     end)
-    makeCtrl("Favs", 12, Color3.fromRGB(80, 90, 40), function()
+    makeCtrl("Favs", 14, Color3.fromRGB(80, 90, 40), function()
         inFavoritesView = not inFavoritesView
+        if inFavoritesView then inRecentsView = false end
+        rebuildMobileGrid(mobileSearchBox.Text)
+    end)
+    makeCtrl("Recents", 15, Color3.fromRGB(60, 80, 110), function()
+        inRecentsView = not inRecentsView
+        if inRecentsView then inFavoritesView = false end
+        rebuildMobileGrid(mobileSearchBox.Text)
+    end)
+    makeCtrl("Clear", 16, Color3.fromRGB(90, 50, 50), function()
+        recents = {}
+        saveRecents()
+        notify("Recents", "Cleared", 2)
         rebuildMobileGrid(mobileSearchBox.Text)
     end)
 
@@ -1239,11 +1798,14 @@ local function buildMobileUI(character, ctx)
         local list
         if inFavoritesView then
             list = favorites
+        elseif inRecentsView then
+            list = recents
         elseif mobileSearchQuery ~= "" then
             list = {}
             local q = string.lower(mobileSearchQuery)
             for _, name in ipairs(allDances) do
-                if string.find(string.lower(name), q, 1, true) then
+                local display = getDisplayName(name)
+                if string.find(string.lower(name), q, 1, true) or string.find(string.lower(display), q, 1, true) then
                     table.insert(list, name)
                 end
             end
@@ -1258,7 +1820,7 @@ local function buildMobileUI(character, ctx)
             b.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
             b.BackgroundTransparency = 0.05
             b.BorderSizePixel = 0
-            b.Text = name
+            b.Text = getDisplayName(name)
             b.TextColor3 = Color3.fromRGB(255, 255, 255)
             b.Font = Enum.Font.GothamBold
             b.TextScaled = true
@@ -1281,9 +1843,11 @@ local function buildMobileUI(character, ctx)
                 star.Parent = b
             end
             b.MouseButton1Click:Connect(function()
+                playSound("click")
                 if ctx.isDancing and ctx.getName() == name then ctx.stop() else ctx.play(name) end
             end)
             b.TouchTap:Connect(function()
+                playSound("click")
                 if ctx.isDancing and ctx.getName() == name then ctx.stop() else ctx.play(name) end
             end)
         end
@@ -1291,10 +1855,12 @@ local function buildMobileUI(character, ctx)
 
     mobileSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         inFavoritesView = false
+        inRecentsView = false
         rebuildMobileGrid(mobileSearchBox.Text)
     end)
 
     local function togglePanel()
+        playSound("open")
         panel.Visible = not panel.Visible
         setBlurActive(panel.Visible)
         if panel.Visible then
@@ -1306,12 +1872,14 @@ local function buildMobileUI(character, ctx)
     toggle.TouchTap:Connect(togglePanel)
     closeBtn.MouseButton1Click:Connect(function()
         if panel.Visible then
+            playSound("click")
             panel.Visible = false
             setBlurActive(false)
         end
     end)
     closeBtn.TouchTap:Connect(function()
         if panel.Visible then
+            playSound("click")
             panel.Visible = false
             setBlurActive(false)
         end
@@ -1393,7 +1961,7 @@ local function setupCharacter(character)
         end
         local kf = loadKF(name)
         if not kf then
-            warn("[CurrentVector-Dances V1] Could not load: " .. name)
+            notify("Error", "Could not load: " .. name, 3)
             return
         end
         currentAnim = animplayer.new(rigTable, kf)
@@ -1435,6 +2003,9 @@ local function setupCharacter(character)
         isSitting = false
         isPPing = false
         playAnim(name, 1, true, true)
+        pushRecent(name)
+        playSound("play", 0.25)
+        notify("Now Playing", getDisplayName(name), 2)
     end
 
     local function playOnce(name)
@@ -1442,6 +2013,7 @@ local function setupCharacter(character)
         isSitting = false
         isPPing = false
         playAnim(name, 1, false, true)
+        playSound("play", 0.25)
         local played = currentAnim
         if played then
             local len = played.Length or 2
@@ -1467,6 +2039,9 @@ local function setupCharacter(character)
         isSitting = false
         isPPing = true
         playAnim("PP", 1, true, false)
+        pushRecent("PP")
+        playSound("play", 0.25)
+        notify("Now Playing", "PP", 2)
     end
 
     local function playWave()
@@ -1474,6 +2049,9 @@ local function setupCharacter(character)
         isSitting = false
         isPPing = false
         playAnim("Wave3", 1, false, false)
+        pushRecent("Wave3")
+        playSound("play", 0.25)
+        notify("Now Playing", "Wave", 2)
         local waveAnim = currentAnim
         if waveAnim then
             waveAnim.OnStopped = function()
@@ -1492,10 +2070,43 @@ local function setupCharacter(character)
         playDance("Twerk")
     end
 
+    local function playLaugh(animName, displayName)
+        local wasSitting = isSitting
+        isDancing = true
+        isSitting = false
+        isPPing = false
+        playAnim(animName, 1, false, true)
+        pushRecent(animName)
+        playSound("play", 0.25)
+        notify("Now Playing", displayName, 2)
+        local laughAnim = currentAnim
+        if laughAnim then
+            laughAnim.OnStopped = function()
+                if currentAnim == laughAnim then
+                    if wasSitting then
+                        playSit()
+                    else
+                        stopDance()
+                    end
+                end
+            end
+        end
+    end
+
+    local function playLaugh1()
+        playLaugh("LAUGHLOLHAHAHAAHAH", "Laugh")
+    end
+
+    local function playLaugh2()
+        playLaugh("LAUGHLOLHAHAHAAHAH2", "Laugh 2")
+    end
+
     local function playSit()
         isDancing = true
         isSitting = true
         isPPing = false
+        playSound("play", 0.25)
+        notify("Now Playing", "Sit", 2)
 
         task.spawn(function()
             pcall(function() loadKF("Sitting") end)
@@ -1515,13 +2126,14 @@ local function setupCharacter(character)
 
     local function unsit()
         if not isSitting then
-            notify("Not sitting")
+            notify("Unsit", "Not sitting", 2)
             return
         end
 
         isDancing = true
         isSitting = false
         isPPing = false
+        playSound("stop", 0.3)
 
         task.spawn(function()
             pcall(function() loadKF("Sitting") end)
@@ -1536,6 +2148,22 @@ local function setupCharacter(character)
                     stopDance()
                 end
             end
+        end
+    end
+
+    local function playEmote(name)
+        if name == "LAUGHLOLHAHAHAAHAH" then
+            if isDancing and currentAnimName == name then stopDance() else playLaugh1() end
+            return
+        end
+        if name == "LAUGHLOLHAHAHAAHAH2" then
+            if isDancing and currentAnimName == name then stopDance() else playLaugh2() end
+            return
+        end
+        if isDancing and currentAnimName == name then
+            stopDance()
+        else
+            playDance(name)
         end
     end
 
@@ -1585,23 +2213,19 @@ local function setupCharacter(character)
         end)
     end
 
-    wheelPlayRef.fn = function(name)
-        if isDancing and currentAnimName == name then
-            stopDance()
-        else
-            playDance(name)
-        end
-    end
+    wheelPlayRef.fn = playEmote
 
     if IS_MOBILE then
         buildMobileUI(character, {
-            play = playDance,
+            play = playEmote,
             stop = stopDance,
             sit = playSit,
             unsit = unsit,
             pp = playPP,
             wave = playWave,
             twerk = playTwerk,
+            laugh = playLaugh1,
+            laugh2 = playLaugh2,
             isDancing = isDancing,
             isSitting = function() return isSitting end,
             isSprinting = function() return sprinting end,
@@ -1671,30 +2295,39 @@ local function setupCharacter(character)
             local idx = (key == "q" and 1) or (key == "e" and 2) or 3
             local dance = emotes[idx]
             if dance then
-                if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
+                playEmote(dance)
             end
         elseif key == "m" then
-            if searchQuery == "" and not inFavoritesView then
+            if searchQuery == "" and not inFavoritesView and not inRecentsView then
                 currentPage = currentPage + 1
                 if currentPage > #wheelPages then currentPage = 1 end
-                notify("Page " .. currentPage)
+                playSound("click")
+                notify("Page", tostring(currentPage) .. " / " .. tostring(#wheelPages), 2)
                 refreshWheelPage()
             end
         elseif key == "equals" then
             bgMusicOn = not bgMusicOn
-            if bgMusicOn then music:Play() notify("Music ON") else music:Stop() notify("Music OFF") end
+            if bgMusicOn then
+                if musicLoaded then music:Play() end
+                notify("Music", "Enabled", 2)
+            else
+                music:Stop()
+                notify("Music", "Disabled", 2)
+            end
+            playSound("click")
         elseif key == "backspace" then
             stopDance()
-            notify("Stopped")
+            playSound("stop")
+            notify("Stopped", "Dance cancelled", 2)
         elseif key == "leftbracket" then
             if currentAnim then
                 currentAnim.Speed = math.max(0.1, currentAnim.Speed - 0.1)
-                notify("Speed: " .. string.format("%.1f", currentAnim.Speed))
+                notify("Speed", string.format("%.1f", currentAnim.Speed), 2)
             end
         elseif key == "rightbracket" then
             if currentAnim then
                 currentAnim.Speed = math.min(5, currentAnim.Speed + 0.1)
-                notify("Speed: " .. string.format("%.1f", currentAnim.Speed))
+                notify("Speed", string.format("%.1f", currentAnim.Speed), 2)
             end
         elseif key == "one" or key == "two" or key == "three" or key == "four"
             or key == "five" or key == "six" or key == "seven" or key == "eight" then
@@ -1702,12 +2335,13 @@ local function setupCharacter(character)
             local emotes = getDisplayedEmotes()
             local dance = emotes[map[key]]
             if dance then
-                if isDancing and currentAnimName == dance then stopDance() else playDance(dance) end
+                playEmote(dance)
             end
         elseif key == "f" then
             if currentAnimName and not (currentAnimName == "Idle" or currentAnimName == "WalkV2" or currentAnimName == "RunV2") then
                 local added = toggleFavorite(currentAnimName)
-                notify(added and ("Favorited " .. currentAnimName) or ("Unfavorited " .. currentAnimName))
+                playSound("click")
+                notify(added and "Favorited" or "Unfavorited", getDisplayName(currentAnimName), 2)
                 if inFavoritesView then refreshWheelPage() end
             end
         end
@@ -1728,38 +2362,38 @@ local function setupCharacter(character)
         if string.sub(lower, 1, 7) == "/dance " then
             local name = string.sub(msg, 8)
             for _, d in ipairs(allDances) do
-                if string.lower(d) == string.lower(name) then
-                    playDance(d)
+                if string.lower(d) == string.lower(name) or string.lower(getDisplayName(d)) == string.lower(name) then
+                    playEmote(d)
                     return
                 end
             end
-            notify("Unknown dance: " .. name)
+            notify("Unknown Dance", name, 3)
         elseif lower == "/poop" then
             playOnce("Poop")
-            notify("Poop!")
+            notify("Now Playing", "Poop", 2)
         elseif lower == "/pp" then
             playPP()
-            notify(isPPing and "PP ON" or "PP OFF")
         elseif lower == "/wave" then
             playWave()
-            notify("Waving")
         elseif lower == "/tw" or lower == "/twerk" then
             playTwerk()
-            notify("Twerking")
+        elseif lower == "/laugh" then
+            playLaugh1()
+        elseif lower == "/laugh2" then
+            playLaugh2()
         elseif lower == "/sit" then
             if isSitting then
                 unsit()
-                notify("Stood up")
             else
                 playSit()
-                notify("Sitting")
             end
         elseif lower == "/unsit" then
             unsit()
         elseif lower == "/stop" then
             stopDance()
+            notify("Stopped", "Dance cancelled", 2)
         elseif lower == "/cv" then
-            notify("CurrentVector-Dances V1 | Page " .. currentPage)
+            notify("CurrentVector-Dances V1", "Page " .. currentPage .. " / " .. #wheelPages, 3)
         end
     end))
 
@@ -1770,7 +2404,7 @@ local function setupCharacter(character)
         local moving = hum.MoveDirection.Magnitude > 0.1
         local threshold = 0.9
 
-        if isDancing then
+        if isDancing and not isSitting then
             tiltRoot = tiltRoot:Lerp(CFrame.new(), 0.15)
             tiltNeck = tiltNeck:Lerp(CFrame.new(), 0.15)
             tiltRShoulder = tiltRShoulder:Lerp(CFrame.new(), 0.15)
@@ -1854,7 +2488,7 @@ local function setupCharacter(character)
         EXTRA_TILT["Right Leg"] = tiltRHip
         EXTRA_TILT["Left Leg"] = tiltLHip
 
-        if not isDancing and not moving and neckMotor and head and torso then
+        if (not isDancing or isSitting) and not moving and neckMotor and head and torso then
             local headToMouse = mouse.Hit.Position - head.Position
             if headToMouse.Magnitude > 0.01 then
                 local dir = headToMouse.Unit
@@ -1911,26 +2545,33 @@ local function setupCharacter(character)
     end))
 
     playAnim("Idle", 1, true, false)
-    if bgMusicOn then music:Play() end
-    notify("CurrentVector-Dances V1 loaded")
-
-    task.delay(1, function() refreshWheelPage() end)
 end
 
 characterConn = player.CharacterAdded:Connect(setupCharacter)
 if player.Character then setupCharacter(player.Character) end
 
+task.delay(0.5, function()
+    notify("Welcome to CurrentVector", "Join the AvHub Discord for the best Roblox scripts!", 10)
+    safeSetClipboard(DISCORD_URL)
+    task.delay(1.2, function()
+        notify("Discord Invite", "Copied to clipboard: " .. DISCORD_URL, 8)
+    end)
+end)
+
 print("==========================================")
 print("[CurrentVector-Dances V1] Ready")
 if IS_MOBILE then
     print("Mobile: Tap the CV button to open the mobile panel")
-    print("Mobile has search bar, emote list, and full controls")
+    print("Mobile has search, emote list, recents, favorites, and full controls")
 else
     print("Dances: Q / E / R | Twerk: T")
     print("Page: M | Music: =")
     print("Stop: Backspace | Speed: [ ]")
     print("Favorite: F | Sprint: Hold LeftControl")
 end
-print("Wheel: Search bar + Favorites button + 8 slots per page")
-print("Chat: /dance <name> | /poop | /pp | /wave | /tw | /sit | /unsit | /stop | /cv")
+print("Wheel: Search bar + Favorites + Recents + 8 slots per page")
+print("Notifications: every action shows a toast in the bottom right")
+print("Auto-Update: checks GitHub every 5 minutes for new emotes")
+print("Sounds: UI clicks + background music from GitHub")
+print("Chat: /dance <name> | /poop | /pp | /wave | /tw | /laugh | /laugh2 | /sit | /unsit | /stop | /cv")
 print("==========================================")
